@@ -1,1 +1,1 @@
-# Drug synergy prediction using permuatation invariant multi-output GPs
+# Drug synergy prediction using permutation invariant multi-output GPs
