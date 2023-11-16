@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='synpred',
     version='0.0.1',
-    packages=['synpred'],
+    packages=find_packages(),
     url='',
     license='',
     author='leiv',
