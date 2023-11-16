@@ -64,14 +64,14 @@ class GPattKroneckerSumAddedDiagLinearOperator(SumLinearOperator):
         print("computing log-det with Weyl's inequality!")
         # Compute eigenvectors for gradients
         # It suffices to eigen-decomp the second term in the KroneckerSum
-        evals_unsorted, _ = self._lazy_tensor.lazy_tensors[1].symeig(eigenvectors=False)
+        evals_unsorted, _ = self._linear_op.linear_ops[1]._symeig(eigenvectors=False)
         evals = evals_unsorted.sort(descending=True)[0]
         # Clamp to zero
         evals = evals.clamp_min(0.0)
         # And multiply by two
         evals = 2 * evals
         # Pull out the constant diagonal
-        noise_unsorted = self._diag_tensor.diag()
+        noise_unsorted = self._diag_tensor._diagonal()
         noise_unsorted = noise_unsorted.masked_fill(self.missing_idx, 0)  # Mask large variances
         noise = noise_unsorted.sort(descending=True)[0]
         # Apply Weyl's inequality
@@ -85,7 +85,7 @@ class GPattKroneckerSumAddedDiagLinearOperator(SumLinearOperator):
 
     def _preconditioner(self):
         def precondition_closure(tensor):
-            return tensor / self._diag_tensor.diag().unsqueeze(-1)
+            return tensor / self._diag_tensor._diagonal().unsqueeze(-1)
 
         return precondition_closure, None, None
 
@@ -106,6 +106,6 @@ class GPattKroneckerSumAddedDiagLinearOperator(SumLinearOperator):
 
     def __add__(self, other):
         if isinstance(other, DiagLinearOperator):
-            return self.__class__(self._lazy_tensor, self._diag_tensor + other)
+            return self.__class__(self._linear_op, self._diag_tensor + other)
         else:
             raise RuntimeError("Only DiagLazyTensors can be added to a GPattKroneckerSumAddedDiagLazyTensor!")
