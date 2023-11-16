@@ -14,21 +14,8 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
     """
 
     def __init__(self, *linops):
-        linops = list(linops)
-        if len(linops) > 2:
-            raise RuntimeError('A GPattKroneckerSumAddedDiagLinearOperator must have exactly two components')
+        print("some init going on!")
         super(GPattKroneckerSumAddedDiagLinearOperator, self).__init__(*linops)
-
-        if isinstance(linops[0], DiagLinearOperator) and isinstance(linops[1], DiagLinearOperator):
-            raise RuntimeError("Trying to lazily add two DiagLazyTensors. Create a single DiagLazyTensor instead.")
-        elif isinstance(linops[0], DiagLinearOperator):
-            self._diag_tensor = linops[0]
-            self._lazy_tensor = linops[1]
-        elif isinstance(linops[1], DiagLinearOperator):
-            self._diag_tensor = linops[1]
-            self._lazy_tensor = linops[0]
-        else:
-            raise RuntimeError("One of the LazyTensors input to GPattKroneckerSumAddedDiagLinearOperator must be a DiagLazyTensor!")
         self.missing_idx = (self._diag_tensor.diag() >= 500.).clone().detach()  # Hardcoded which is not optimal
         self.n_missing = self.missing_idx.sum()
         self.n_total = self.missing_idx.numel()

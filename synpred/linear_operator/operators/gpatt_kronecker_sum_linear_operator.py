@@ -12,7 +12,9 @@ class GPattKroneckerSumLinearOperator(SumLinearOperator):
     """
 
     def __add__(self, other):
+        print("I am trying to add!")
         if isinstance(other, DiagLinearOperator):
+            print("I am adding!")
             return GPattKroneckerSumAddedDiagLinearOperator(self, other)
         else:
             raise RuntimeError("Invalid addition")
