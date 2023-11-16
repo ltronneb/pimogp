@@ -1,6 +1,9 @@
 from linear_operator.operators.sum_linear_operator import SumLinearOperator
 from linear_operator.operators.diag_linear_operator import DiagLinearOperator
 
+from synpred.linear_operator.operators.gpatt_kronecker_sum_added_diag_linear_operator import \
+    GPattKroneckerSumAddedDiagLinearOperator
+
 
 class GPattKroneckerSumLinearOperator(SumLinearOperator):
     """
@@ -11,9 +14,7 @@ class GPattKroneckerSumLinearOperator(SumLinearOperator):
 
     def __add__(self, other):
         if isinstance(other, DiagLinearOperator):
-            # TODO: implement kroneckersumaddeddiag
-            # from .gpatt_kronecker_sum_added_diag_lazy_tensor import GPattKroneckerSumAddedDiagLazyTensor
-            #return GPattKroneckerSumAddedDiagLazyTensor(self, other)
+            return GPattKroneckerSumAddedDiagLinearOperator(self, other)
             pass
         else:
             raise RuntimeError("Invalid addition")
