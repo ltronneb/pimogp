@@ -15,7 +15,6 @@ class GPattKroneckerProductLinearOperator(KroneckerProductLinearOperator):
 
     def __add__(self, other):
         if isinstance(other, GPattKroneckerProductLinearOperator):
-            print("test")
             return GPattKroneckerSumLinearOperator(self, other)
         else:
             raise RuntimeError("Invalid addition")

@@ -1,22 +1,45 @@
 from typing import Callable, Optional, Tuple, Union
 
-from linear_operator.operators.added_diag_linear_operator import AddedDiagLinearOperator
+from linear_operator.operators import SumLinearOperator
 from linear_operator.operators.diag_linear_operator import DiagLinearOperator
 import torch
 from jaxtyping import Float
 from linear_operator import LinearOperator
 
 
-class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
+class GPattKroneckerSumAddedDiagLinearOperator(SumLinearOperator):
     """
         Linear operator to deal with the case where the base-kernel is a GPattKroneckerSumLinearOperator
         This is the case when we work with the invariant-kernels used in the DrugCombinationKernel
     """
 
-    def __init__(self, *linops):
-        print("some init going on!")
-        super(GPattKroneckerSumAddedDiagLinearOperator, self).__init__(*linops)
-        self.missing_idx = (self._diag_tensor.diag() >= 500.).clone().detach()  # Hardcoded which is not optimal
+    def __init__(
+        self,
+        *linear_ops: Union[Tuple[LinearOperator, DiagLinearOperator], Tuple[DiagLinearOperator, LinearOperator]],
+        preconditioner_override: Optional[Callable] = None,
+    ):
+        linear_ops = list(linear_ops)
+        super(GPattKroneckerSumAddedDiagLinearOperator, self).__init__(*linear_ops, preconditioner_override=preconditioner_override)
+        if len(linear_ops) > 2:
+            raise RuntimeError("An AddedDiagLinearOperator can only have two components")
+
+        if isinstance(linear_ops[0], DiagLinearOperator) and isinstance(linear_ops[1], DiagLinearOperator):
+            raise RuntimeError(
+                "Trying to lazily add two DiagLinearOperators. Create a single DiagLinearOperator instead."
+            )
+        elif isinstance(linear_ops[0], DiagLinearOperator):
+            self._diag_tensor = linear_ops[0]
+            self._linear_op = linear_ops[1]
+        elif isinstance(linear_ops[1], DiagLinearOperator):
+            self._diag_tensor = linear_ops[1]
+            self._linear_op = linear_ops[0]
+        else:
+            raise RuntimeError(
+                "One of the LinearOperators input to AddedDiagLinearOperator must be a DiagLinearOperator!"
+            )
+
+        self.preconditioner_override = preconditioner_override
+        self.missing_idx = (self._diag_tensor._diagonal() >= 500.).clone().detach()  # Hardcoded which is not optimal
         self.n_missing = self.missing_idx.sum()
         self.n_total = self.missing_idx.numel()
         self.n_obs = self.n_total - self.n_missing
