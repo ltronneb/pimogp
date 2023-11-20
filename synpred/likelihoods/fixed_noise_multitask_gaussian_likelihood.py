@@ -2,8 +2,11 @@ from typing import Any, Optional
 
 from gpytorch import Module
 from gpytorch.constraints import GreaterThan
+from gpytorch.lazy import LazyEvaluatedKernelTensor
 from gpytorch.likelihoods import GaussianLikelihood
 import torch
+import warnings
+from gpytorch.utils.warnings import GPInputWarning
 from linear_operator.operators import DiagLinearOperator, ZeroLinearOperator
 from torch import Tensor
 
@@ -31,6 +34,39 @@ class FixedNoiseMultitaskGaussianLikelihood(GaussianLikelihood):
                 self.register_prior("raw_global_noise_prior", noise_prior, lambda m: m.noise)
         self.has_global_noise = has_global_noise
         self.num_tasks = num_tasks
+
+
+    @property
+    def global_noise(self):
+        nnn = self.raw_global_noise_constraint.transform(self.raw_global_noise)
+        return nnn
+
+    @global_noise.setter
+    def global_noise(self, value):
+        self.initialize(raw_global_noise=self.raw_global_noise_constraint.inverse_transform(value))
+
+    def marginal(self, function_dist, *params, **kwargs):
+        mean, covar = function_dist.mean, function_dist.lazy_covariance_matrix
+        # ensure that sumKroneckerLT is actually called
+        if isinstance(covar, LazyEvaluatedKernelTensor):
+            covar = covar.evaluate_kernel()
+        covar_kron_lt = self._shaped_noise_covar(mean.shape, *params, add_noise=True, **kwargs)
+        covar = covar + covar_kron_lt
+        return function_dist.__class__(mean, covar)
+
+    def _shaped_noise_covar(self, shape, *params, add_noise=True,  **kwargs):
+        noise = self.noise_covar(*params, shape=shape, **kwargs)
+        # Here now, we add a diagonal for the added global noise
+        if add_noise and self.has_global_noise:
+            glob_noise = DiagLinearOperator(self.global_noise)
+            noise = noise + glob_noise
+        elif isinstance(noise, ZeroLinearOperator):
+            warnings.warn(
+                "You have passed data through a FixedNoiseGaussianLikelihood that did not match the size "
+                "of the fixed noise, *and* you did not specify noise. This is treated as a no-op.",
+                GPInputWarning,
+            )
+        return noise
 
 
 class MultitaskFixedGaussianNoise(Module):
