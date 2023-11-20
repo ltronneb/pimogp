@@ -19,7 +19,6 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
     ):
         super(GPattKroneckerSumAddedDiagLinearOperator, self).__init__(*linear_ops,
                                                                        preconditioner_override=preconditioner_override)
-        self.preconditioner_override = preconditioner_override
         self.missing_idx = (self._diag_tensor._diagonal() >= 500.).clone().detach()  # Hardcoded which is not optimal
         self.n_missing = self.missing_idx.sum()
         self.n_total = self.missing_idx.numel()
