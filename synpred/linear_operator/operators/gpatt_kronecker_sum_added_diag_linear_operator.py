@@ -24,6 +24,16 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
         self.n_total = self.missing_idx.numel()
         self.n_obs = self.n_total - self.n_missing
 
+    def inv_quad_logdet(self, inv_quad_rhs=None, logdet=False, reduce_inv_quad=True):
+        if inv_quad_rhs is not None:
+            inv_quad_term, _ = super().inv_quad_logdet(
+                inv_quad_rhs=inv_quad_rhs, logdet=False, reduce_inv_quad=reduce_inv_quad
+            )
+        else:
+            inv_quad_term = None
+        logdet_term = self._logdet() if logdet else None
+        return inv_quad_term, logdet_term
+
     def _logdet(self):
         print("test")
         """
