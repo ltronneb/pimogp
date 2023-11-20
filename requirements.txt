@@ -2,3 +2,4 @@ linear_operator~=0.5.2
 jaxtyping~=0.2.9
 setuptools~=68.0.0
 torch>=1.11
+gpytorch~=1.11
