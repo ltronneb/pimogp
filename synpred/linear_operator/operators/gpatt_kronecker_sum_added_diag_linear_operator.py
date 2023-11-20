@@ -17,7 +17,6 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
             *linear_ops: Union[Tuple[LinearOperator, DiagLinearOperator], Tuple[DiagLinearOperator, LinearOperator]],
             preconditioner_override: Optional[Callable] = None,
     ):
-        linear_ops = list(linear_ops)
         super(GPattKroneckerSumAddedDiagLinearOperator, self).__init__(*linear_ops,
                                                                        preconditioner_override=preconditioner_override)
         self.preconditioner_override = preconditioner_override
