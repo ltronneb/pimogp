@@ -3,16 +3,17 @@ from typing import Any, Optional, Union
 from gpytorch import Module, settings
 from gpytorch.constraints import GreaterThan
 from gpytorch.lazy import LazyEvaluatedKernelTensor
-from gpytorch.likelihoods import GaussianLikelihood
+from gpytorch.likelihoods import _GaussianLikelihoodBase
 import torch
 import warnings
 from gpytorch.utils.warnings import GPInputWarning
+from linear_operator import LinearOperator
 from linear_operator.operators import DiagLinearOperator, ZeroLinearOperator
 from linear_operator.utils.warnings import NumericalWarning
 from torch import Tensor
 
 
-class FixedNoiseMultitaskGaussianLikelihood(GaussianLikelihood):
+class FixedNoiseMultitaskGaussianLikelihood(_GaussianLikelihoodBase):
     """
         A multitask extension of FixedNoiseGaussianLikelihood
         """
@@ -104,3 +105,9 @@ class MultitaskFixedGaussianNoise(Module):
     def _apply(self, fn):
         self.noise = fn(self.noise)
         return super(MultitaskFixedGaussianNoise, self)._apply(fn)
+
+    def __call__(
+            self, *params: Any, shape: Optional[torch.Size] = None, **kwargs: Any
+    ) -> Union[Tensor, LinearOperator]:
+        # For correct typing
+        return super().__call__(*params, shape=shape, **kwargs)
