@@ -13,6 +13,6 @@ class GPattKroneckerSumLinearOperator(SumLinearOperator):
 
     def __add__(self, other):
         if isinstance(other, DiagLinearOperator):
-            return GPattKroneckerSumAddedDiagLinearOperator(self, other,preconditioner_override=None)
+            return GPattKroneckerSumAddedDiagLinearOperator(self, other, preconditioner_override=None)
         else:
             raise RuntimeError("Invalid addition")
