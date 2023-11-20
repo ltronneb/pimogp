@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 
-from gpytorch import Module
+from gpytorch import Module, settings
 from gpytorch.constraints import GreaterThan
 from gpytorch.lazy import LazyEvaluatedKernelTensor
 from gpytorch.likelihoods import GaussianLikelihood
@@ -8,6 +8,7 @@ import torch
 import warnings
 from gpytorch.utils.warnings import GPInputWarning
 from linear_operator.operators import DiagLinearOperator, ZeroLinearOperator
+from linear_operator.utils.warnings import NumericalWarning
 from torch import Tensor
 
 
@@ -72,6 +73,15 @@ class FixedNoiseMultitaskGaussianLikelihood(GaussianLikelihood):
 class MultitaskFixedGaussianNoise(Module):
     def __init__(self, noise: Tensor, num_tasks=1) -> None:
         super().__init__()
+        min_noise = settings.min_fixed_noise.value(noise.dtype)
+        if noise.lt(min_noise).any():
+            warnings.warn(
+                "Very small noise values detected. This will likely "
+                "lead to numerical instabilities. Rounding small noise "
+                f"values up to {min_noise}.",
+                NumericalWarning,
+            )
+            noise = noise.clamp_min(min_noise)
         self.noise = noise
         self.num_tasks = num_tasks
 
