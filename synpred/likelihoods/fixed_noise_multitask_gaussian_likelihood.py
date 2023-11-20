@@ -105,9 +105,3 @@ class MultitaskFixedGaussianNoise(Module):
     def _apply(self, fn):
         self.noise = fn(self.noise)
         return super(MultitaskFixedGaussianNoise, self)._apply(fn)
-
-    def __call__(
-            self, *params: Any, shape: Optional[torch.Size] = None, **kwargs: Any
-    ) -> Union[Tensor, LinearOperator]:
-        # For correct typing
-        return super().__call__(*params, shape=shape, **kwargs)
