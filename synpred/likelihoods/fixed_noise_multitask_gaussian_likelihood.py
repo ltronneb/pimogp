@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from gpytorch import Module
 from gpytorch.constraints import GreaterThan
@@ -77,7 +77,7 @@ class MultitaskFixedGaussianNoise(Module):
 
     def forward(
             self, *params: Any, shape: Optional[torch.Size] = None, noise: Optional[Tensor] = None, **kwargs: Any
-    ) -> DiagLinearOperator:
+    ) -> Union[DiagLinearOperator, ZeroLinearOperator]:
 
         if shape is None:
             p = params[0] if torch.is_tensor(params[0]) else params[0][0]
