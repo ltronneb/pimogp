@@ -35,11 +35,9 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
         return inv_quad_term, logdet_term
 
     def _logdet(self):
-        print("test")
         """
         Log-determinant computed uses an approximation via Weyl's inequality
         """
-        print("computing log-det with Weyl's inequality!")
         # Compute eigenvectors for gradients
         # It suffices to eigen-decomp the second term in the KroneckerSum
         evals_unsorted, _ = self._linear_op.linear_ops[1]._symeig(eigenvectors=False)
@@ -53,7 +51,6 @@ class GPattKroneckerSumAddedDiagLinearOperator(AddedDiagLinearOperator):
         noise_unsorted = noise_unsorted.masked_fill(self.missing_idx, 0)  # Mask large variances
         noise = noise_unsorted.sort(descending=True)[0]
         # Apply Weyl's inequality
-        print(len(evals))
         weyl = torch.zeros(evals.shape, device=self.device)
         weyl[0::2] = evals[0:int(len(evals) / 2):1] + noise[0:int(len(evals) / 2):1]
         weyl[1::2] = evals[1:int(len(evals) / 2 + 1):1] + noise[0:int(len(evals) / 2):1]
