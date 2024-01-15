@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+import linear_operator
 import torch
 from linear_operator.operators import KroneckerProductLinearOperator, RootLinearOperator
 from linear_operator.utils.interpolation import left_interp
@@ -9,6 +10,7 @@ from gpytorch import settings
 from gpytorch.distributions import MultitaskMultivariateNormal, MultivariateNormal
 from gpytorch.module import Module
 from gpytorch.variational._variational_strategy import _VariationalStrategy
+from gpytorch.kernels import Kernel
 
 
 def _select_lmc_coefficients(lmc_coefficients: torch.Tensor, indices: torch.LongTensor) -> torch.Tensor:
@@ -106,6 +108,7 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
     def __init__(
         self,
         base_variational_strategy: _VariationalStrategy,
+        output_kernel: Kernel,
         num_tasks: int,
         num_latents: int = 1,
         latent_dim: int = -1,
@@ -124,6 +127,9 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
                 f"Mismatch in num_latents: got a variational distribution of batch shape {batch_shape}, "
                 f"expected the function dim {latent_dim} to be {num_latents}."
             )
+        # Check if number of latents larger than number of outputs
+        if num_tasks < num_latents:
+            raise RuntimeError(f"number of latents must be smaller than number of outputs!")
         self.num_latents = num_latents
         self.latent_dim = latent_dim
 
@@ -132,9 +138,14 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         del self.batch_shape[self.latent_dim]
         self.batch_shape = torch.Size(self.batch_shape)
 
-        # LCM coefficients
-        lmc_coefficients = torch.randn(*batch_shape, self.num_tasks)
-        self.register_parameter("lmc_coefficients", torch.nn.Parameter(lmc_coefficients))
+        # LCM coefficients generated from the kernel over the outputs
+        self.output_kernel = output_kernel
+        evals, evecs = self.output_kernel.symeig(eigenvectors=True)
+        evecs = evecs[:, -self.num_latents:]
+        evals = linear_operator.operators.DiagLinearOperator(evals[-self.num_latents:])
+        self.lmc_coefficients = evecs.matmul(evals.sqrt()).t()
+        # lmc_coefficients = torch.randn(*batch_shape, self.num_tasks)
+        # self.register_parameter("lmc_coefficients", torch.nn.Parameter(lmc_coefficients))
 
         if jitter_val is None:
             self.jitter_val = settings.variational_cholesky_jitter.value(
