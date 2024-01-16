@@ -109,6 +109,7 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         self,
         base_variational_strategy: _VariationalStrategy,
         output_kernel: Kernel,
+        output_covars: Tensor,
         num_tasks: int,
         num_latents: int = 1,
         latent_dim: int = -1,
@@ -140,12 +141,7 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
 
         # LCM coefficients generated from the kernel over the outputs
         self.output_kernel = output_kernel
-        evals, evecs = self.output_kernel.symeig(eigenvectors=True)
-        evecs = evecs[:, -self.num_latents:]
-        evals = linear_operator.operators.DiagLinearOperator(evals[-self.num_latents:])
-        self.lmc_coefficients = evecs.matmul(evals.sqrt()).t()
-        # lmc_coefficients = torch.randn(*batch_shape, self.num_tasks)
-        # self.register_parameter("lmc_coefficients", torch.nn.Parameter(lmc_coefficients))
+        self.output_covars = output_covars
 
         if jitter_val is None:
             self.jitter_val = settings.variational_cholesky_jitter.value(
@@ -153,6 +149,14 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
             )
         else:
             self.jitter_val = jitter_val
+
+    @property
+    def lmc_coefficients(self) -> Tensor:
+        evals, evecs = self.output_kernel(self.output_covars).symeig(eigenvectors=True)
+        evecs = evecs[:, -self.num_latents:]
+        evals = linear_operator.operators.DiagLinearOperator(evals[-self.num_latents:])
+        return evecs.matmul(evals.sqrt()).t().evaluate()
+
 
     @property
     def prior_distribution(self) -> MultivariateNormal:
