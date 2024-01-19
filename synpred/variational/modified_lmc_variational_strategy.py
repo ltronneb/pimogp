@@ -140,6 +140,7 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         self.batch_shape = torch.Size(self.batch_shape)
 
         # LCM coefficients generated from the kernel over the outputs
+        # actual definition is in lmc_coefficient property below
         self.output_kernel = output_kernel
         self.output_covars = output_covars
 
@@ -157,7 +158,6 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         evals = linear_operator.operators.DiagLinearOperator(evals[-self.num_latents:])
         return evecs.matmul(evals.sqrt()).t().evaluate()
 
-
     @property
     def prior_distribution(self) -> MultivariateNormal:
         return self.base_variational_strategy.prior_distribution
@@ -174,7 +174,8 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         return super().kl_divergence().sum(dim=self.latent_dim)
 
     def __call__(
-        self, x: Tensor, prior: bool = False, task_indices: Optional[LongTensor] = None, **kwargs
+        self, x: Tensor, prior: bool = False, task_indices: Optional[LongTensor] = None,
+            task_covars: Optional[Tensor] = None, **kwargs
     ) -> Union[MultitaskMultivariateNormal, MultivariateNormal]:
         r"""
         Computes the variational (or prior) distribution
@@ -216,8 +217,14 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
 
             # Every data point will get an output for each task
             # Therefore, we will set up the lmc_coefficients shape for a matmul
-            lmc_coefficients = self.lmc_coefficients.expand(*latent_dist.batch_shape, self.lmc_coefficients.size(-1))
-
+            if task_covars is None:
+                lmc_coefficients = self.lmc_coefficients.expand(*latent_dist.batch_shape,
+                                                                self.lmc_coefficients.size(-1))
+            else:
+                k_star = self.output_kernel(task_covars,self.output_covars)
+                anew = torch.linalg.solve(self.lmc_coefficients.matmul(self.lmc_coefficients.t()),
+                                          self.lmc_coefficients.matmul(k_star.evaluate().unsqueeze(-1))).squeeze(-1).t()
+                lmc_coefficients = anew.expand(*latent_dist.batch_shape, anew.size(-1))
             # Mean: ... x N x num_tasks
             latent_mean = latent_dist.mean.permute(*range(0, latent_dim), *range(latent_dim + 1, num_dim), latent_dim)
             mean = latent_mean @ lmc_coefficients.permute(
@@ -237,7 +244,13 @@ class ModifiedLMCVariationalStrategy(_VariationalStrategy):
         else:
             # Each data point will get a single output corresponding to a single task
             # Therefore, we will select the appropriate lmc coefficients for each task
-            lmc_coefficients = _select_lmc_coefficients(self.lmc_coefficients, task_indices)
+            if task_covars is None:
+                lmc_coefficients = _select_lmc_coefficients(self.lmc_coefficients, task_indices)
+            else:
+                k_star = self.output_kernel(task_covars, self.output_covars)
+                anew = torch.linalg.solve(self.lmc_coefficients.matmul(self.lmc_coefficients.t()),
+                                          self.lmc_coefficients.matmul(k_star.evaluate().unsqueeze(-1))).squeeze(-1).t()
+                lmc_coefficients = _select_lmc_coefficients(anew, task_indices)
 
             # Mean: ... x N
             mean = (latent_dist.mean * lmc_coefficients).sum(latent_dim)
