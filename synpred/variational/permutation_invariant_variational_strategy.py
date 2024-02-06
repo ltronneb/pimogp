@@ -69,7 +69,7 @@ class PermutationInvariantVariationalStrategy(VariationalStrategy):
             **kwargs,
     ) -> MultivariateNormal:
         # Compute full prior distribution
-        full_inputs = torch.cat([inducing_points, x, torch.index_select(x, 1, self.permutation)], dim=-2)
+        full_inputs = torch.cat([inducing_points, x, torch.index_select(x, -1, self.permutation)], dim=-2)
         full_output = self.model.forward(full_inputs, **kwargs)
         full_covar = full_output.lazy_covariance_matrix
         # Covariance terms
