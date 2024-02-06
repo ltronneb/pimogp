@@ -69,27 +69,20 @@ class PermutationInvariantVariationalStrategy(VariationalStrategy):
             **kwargs,
     ) -> MultivariateNormal:
         # Compute full prior distribution
-        full_inputs = torch.cat([inducing_points, x], dim=-2)
-        full_inputs_flipped = torch.cat([inducing_points, torch.index_select(x, 1, self.permutation)], dim=-2)
-        full_inputs_flipped_flipped = torch.cat([x, torch.index_select(x, 1, self.permutation)], dim=-2)
+        full_inputs = torch.cat([inducing_points, x, torch.index_select(x, 1, self.permutation)], dim=-2)
         full_output = self.model.forward(full_inputs, **kwargs)
-        full_output_flipped = self.model.forward(full_inputs_flipped, **kwargs)
-        full_output_flipped_flipped = self.model.forward(full_inputs_flipped_flipped, **kwargs)
         full_covar = full_output.lazy_covariance_matrix
-        full_covar_flipped = full_output_flipped.lazy_covariance_matrix
-        full_covar_flipped_flipped = full_output_flipped_flipped.lazy_covariance_matrix
-
         # Covariance terms
         num_induc = inducing_points.size(-2)
         num_x = x.size(-2)
-        test_mean = full_output.mean[..., num_induc:]
+        test_mean = full_output.mean[..., num_induc:(num_induc + num_x)]
         induc_induc_covar = full_covar[..., :num_induc, :num_induc].add_jitter(self.jitter_val)
-        induc_data_covar = (full_covar[..., :num_induc, num_induc:] +
-                            full_covar_flipped[..., :num_induc, num_induc:]).to_dense()
-        data_data_covar = (full_covar_flipped_flipped[..., :num_x, :num_x] +
-                           full_covar_flipped_flipped[..., :num_x, num_x:] +
-                           full_covar_flipped_flipped[..., num_x:, :num_x] +
-                           full_covar_flipped_flipped[..., num_x:, num_x:])
+        induc_data_covar = (full_covar[..., :num_induc, num_induc:(num_induc + num_x)] +
+                            full_covar[..., :num_induc, (num_induc + num_x):]).to_dense()
+        data_data_covar = (full_covar[..., num_induc:(num_induc + num_x), num_induc:(num_induc + num_x)] +
+                           full_covar[..., num_induc:(num_induc + num_x), (num_induc + num_x):] +
+                           full_covar[..., (num_induc + num_x):, num_induc:(num_induc + num_x)] +
+                           full_covar[..., (num_induc + num_x):, (num_induc + num_x):])
 
         # Compute interpolation terms
         # K_ZZ^{-1/2} K_ZX
