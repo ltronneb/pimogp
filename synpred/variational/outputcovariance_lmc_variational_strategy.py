@@ -34,7 +34,7 @@ def _select_lmc_coefficients(lmc_coefficients: torch.Tensor, indices: torch.Long
     return res
 
 
-class ModifiedLMCVariationalStrategy(_VariationalStrategy):
+class OutputCovarianceLMCVariationalStrategy(_VariationalStrategy):
     r"""
     LMCVariationalStrategy is an implementation of the "Linear Model of Coregionalization"
     for multitask GPs. This model assumes that there are :math:`Q` latent functions
