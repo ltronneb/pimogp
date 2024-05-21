@@ -5,9 +5,9 @@ from gpytorch import lazify
 from gpytorch.kernels import Kernel, IndexKernel
 from linear_operator.operators import InterpolatedLinearOperator, KroneckerProductLinearOperator
 
-from synpred.linear_operator.operators.gpatt_kronecker_product_linear_operator import \
+from pimogp.linear_operator.operators.gpatt_kronecker_product_linear_operator import \
     GPattKroneckerProductLinearOperator
-from synpred.linear_operator.operators.nonpsd_linearoperator import notpsdlazify
+from pimogp.linear_operator.operators.nonpsd_linearoperator import notpsdlazify
 
 
 class PIICM(Kernel):
