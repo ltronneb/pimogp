@@ -36,73 +36,7 @@ def _select_lmc_coefficients(lmc_coefficients: torch.Tensor, indices: torch.Long
 
 class OutputCovarianceLMCVariationalStrategy(_VariationalStrategy):
     r"""
-    LMCVariationalStrategy is an implementation of the "Linear Model of Coregionalization"
-    for multitask GPs. This model assumes that there are :math:`Q` latent functions
-    :math:`\mathbf g(\cdot) = [g^{(1)}(\cdot), \ldots, g^{(q)}(\cdot)]`,
-    each of which is modelled by a GP.
-    The output functions (tasks) are linear combination of the latent functions:
 
-    .. math::
-
-        f_{\text{task } i}( \mathbf x) = \sum_{q=1}^Q a_i^{(q)} g^{(q)} ( \mathbf x )
-
-    LMCVariationalStrategy wraps an existing :obj:`~gpytorch.variational.VariationalStrategy`.
-    The output will either be a :obj:`~gpytorch.distributions.MultitaskMultivariateNormal` distribution
-    (if we wish to evaluate all tasks for each input) or a :obj:`~gpytorch.distributions.MultivariateNormal`
-    (if we wish to evaluate a single task for each input).
-
-    The base variational strategy is assumed to operate on a multi-batch of GPs, where one
-    of the batch dimensions corresponds to the latent function dimension.
-
-    .. note::
-
-        The batch shape of the base :obj:`~gpytorch.variational.VariationalStrategy` does not
-        necessarily have to correspond to the batch shape of the underlying GP objects.
-
-        For example, if the base variational strategy has a batch shape of `[3]` (corresponding
-        to 3 latent functions), the GP kernel object could have a batch shape of `[3]` or no
-        batch shape. This would correspond to each of the latent functions having different kernels
-        or the same kernel, respectivly.
-
-    Example:
-        >>> class LMCMultitaskGP(gpytorch.models.ApproximateGP):
-        >>>     '''
-        >>>     3 latent functions
-        >>>     5 output dimensions (tasks)
-        >>>     '''
-        >>>     def __init__(self):
-        >>>         # Each latent function shares the same inducing points
-        >>>         # We'll have 32 inducing points, and let's assume the input dimensionality is 2
-        >>>         inducing_points = torch.randn(32, 2)
-        >>>
-        >>>         # The variational parameters have a batch_shape of [3] - for 3 latent functions
-        >>>         variational_distribution = gpytorch.variational.MeanFieldVariationalDistribution(
-        >>>             inducing_points.size(-1), batch_shape=torch.Size([3]),
-        >>>         )
-        >>>         variational_strategy = gpytorch.variational.LMCVariationalStrategy(
-        >>>             gpytorch.variational.VariationalStrategy(
-        >>>                 self, inducing_points, variational_distribution, learn_inducing_locations=True,
-        >>>             ),
-        >>>             num_tasks=5,
-        >>>             num_latents=3,
-        >>>             latent_dim=-1,
-        >>>         )
-        >>>
-        >>>         # Each latent function has its own mean/kernel function
-        >>>         super().__init__(variational_strategy)
-        >>>         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([3]))
-        >>>         self.covar_module = gpytorch.kernels.ScaleKernel(
-        >>>             gpytorch.kernels.RBFKernel(batch_shape=torch.Size([3])),
-        >>>             batch_shape=torch.Size([3]),
-        >>>         )
-        >>>
-
-    :param base_variational_strategy: Base variational strategy
-    :param num_tasks: The total number of tasks (output functions)
-    :param num_latents: The total number of latent functions in each group
-    :param latent_dim: (Default: -1) Which batch dimension corresponds to the latent function batch.
-        **Must be negative indexed**
-    :param jitter_val: Amount of diagonal jitter to add for Cholesky factorization numerical stability
     """
 
     def __init__(

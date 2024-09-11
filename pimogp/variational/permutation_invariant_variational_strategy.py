@@ -83,7 +83,6 @@ class PermutationInvariantVariationalStrategy(VariationalStrategy):
                            full_covar[..., num_induc:(num_induc + num_x), (num_induc + num_x):] +
                            full_covar[..., (num_induc + num_x):, num_induc:(num_induc + num_x)] +
                            full_covar[..., (num_induc + num_x):, (num_induc + num_x):])
-
         # Compute interpolation terms
         # K_ZZ^{-1/2} K_ZX
         # K_ZZ^{-1/2} \mu_Z
