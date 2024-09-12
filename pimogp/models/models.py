@@ -121,7 +121,6 @@ class DrugComboICM_Full(ApproximateGP):
     :param conc_dims: The dimensions of the data input that corresponds to the drug concentrations
     :param drug_covar_dims: The dimension of the data input that corresponds to the drug covariates
     :param cell_covars: A list of cell line covariates for learning the LMC coefficients
-    :param cell_kernels: A list of kernels for each element of cell_covars
     :param num_tasks: The number of tasks / outputs / cell lines
     :param num_latents: The number of latent functions in the LMC
     :param num_inducing: The number of inducing points per latent
@@ -134,7 +133,6 @@ class DrugComboICM_Full(ApproximateGP):
                  conc_dims: Tensor,
                  drug_covar_dims: Tensor,
                  cell_covars: List[Tensor],
-                 cell_kernels: List[Kernel],
                  num_tasks: int,
                  num_latents: int,
                  num_inducing: int,
@@ -162,12 +160,32 @@ class DrugComboICM_Full(ApproximateGP):
             )
 
         # Here set up multiple-kernel learning
+        startdim = 0
+        tmp = cell_covars[0]
+        ncols = int(tmp.shape[-1].long())
+        active = tuple(torch.linspace(startdim, ncols - 1, ncols - 1).long())
+        K = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(
+            active_dims=active,
+            ard_num_dims=ncols))
+        for i in range(1,len(cell_covars)):
+            tmp = cell_covars[i]
+            ncols = int(tmp.shape[-1].long())
+            active = tuple(torch.linspace(startdim, ncols - 1, ncols - 1).long())
+            K = K + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(
+                active_dims=active,
+                ard_num_dims=ncols))
+            startdim = startdim + tmp.shape[-1]
+
+        output_covars = torch.concat(cell_covars,dim=-1)
+        output_kernel = K
 
         # Variational Strategy
         variational_strategy = OutputCovarianceLMCVariationalStrategy(
             PermutationInvariantVariationalStrategy(
                 self, inducing_points, variational_distribution, permutation=permutation,
                 learn_inducing_locations=True),
+            output_kernel=output_kernel,
+            output_covars=output_covars,
             num_tasks=num_tasks, num_latents=num_latents, latent_dim=-1)
 
         super(DrugComboICM_Full, self).__init__(variational_strategy)
@@ -177,7 +195,6 @@ class DrugComboICM_Full(ApproximateGP):
         self.conc_dims = conc_dims
         self.drug_covar_dims = drug_covar_dims
         self.cell_covars = cell_covars
-        self.cell_kernels = cell_kernels
         self.num_tasks = num_tasks
         self.num_latents = num_latents
         self.num_inducing = num_inducing
@@ -206,7 +223,6 @@ class DrugComboICM_Full(ApproximateGP):
                       conc_dims=self.conc_dims,
                       drug_covar_dims=self.drug_covar_dims,
                       cell_covars=self.cell_covars,
-                      cell_kernels=self.cell_kernels,
                       num_tasks=self.num_tasks, num_latents=self.num_latents,
                       num_inducing=self.num_inducing, sample_inducing_from=self.sample_inducing_from,
                       inducing_weights=self.inducing_weights)
@@ -219,6 +235,7 @@ class DrugComboLMC_NC(gpytorch.models.ApproximateGP):
     This specific model wraps the NC, or "No Cell" version of the model, where the LMC parameters are learnged
     free form
     """
+
     def __init__(self, params: List[Dict]):
         G = len(params)
         models = torch.nn.ModuleList([DrugComboICM_NC(**params[i]) for i in range(G)])
@@ -237,13 +254,15 @@ class DrugComboLMC_NC(gpytorch.models.ApproximateGP):
     def reinit(self):
         self.__init__(self.params)
 
+
 class DrugComboLMC_Full(gpytorch.models.ApproximateGP):
     r"""
     Simple wrapper that constructs a proper LMC model from a list of ICM models.
 
-    This specific model wraps the NC, or "No Cell" version of the model, where the LMC parameters are learnged
-    free form
+    This specific model wraps the Full, version of the model, where the LMC parameters are learned
+    from a covariance function over cell line covariates.
     """
+
     def __init__(self, params: List[Dict]):
         G = len(params)
         models = torch.nn.ModuleList([DrugComboICM_Full(**params[i]) for i in range(G)])
