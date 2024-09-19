@@ -262,7 +262,6 @@ class DrugComboLMC_Full(gpytorch.models.ApproximateGP):
     This specific model wraps the Full, version of the model, where the LMC parameters are learned
     from a covariance function over cell line covariates.
     """
-a
     def __init__(self, params: List[Dict]):
         G = len(params)
         models = torch.nn.ModuleList([DrugComboICM_Full(**params[i]) for i in range(G)])
