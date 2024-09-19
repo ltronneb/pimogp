@@ -188,7 +188,7 @@ class DrugComboICM_MKL(ApproximateGP):
             output_covars=output_covars,
             num_tasks=num_tasks, num_latents=num_latents, latent_dim=-1)
 
-        super(DrugComboICM_Full, self).__init__(variational_strategy)
+        super(DrugComboICM_MKL, self).__init__(variational_strategy)
 
         # Store permutation here
         self.permutation = permutation
@@ -255,7 +255,7 @@ class DrugComboLMC_NC(gpytorch.models.ApproximateGP):
         self.__init__(self.params)
 
 
-class DrugComboLMC_Full(gpytorch.models.ApproximateGP):
+class DrugComboLMC_MKL(gpytorch.models.ApproximateGP):
     r"""
     Simple wrapper that constructs a proper LMC model from a list of ICM models.
 
@@ -264,11 +264,11 @@ class DrugComboLMC_Full(gpytorch.models.ApproximateGP):
     """
     def __init__(self, params: List[Dict]):
         G = len(params)
-        models = torch.nn.ModuleList([DrugComboICM_Full(**params[i]) for i in range(G)])
+        models = torch.nn.ModuleList([DrugComboICM_MKL(**params[i]) for i in range(G)])
 
         variational_strategy = SumVariationalStrategy(models)
 
-        super(DrugComboLMC_Full, self).__init__(variational_strategy)
+        super(DrugComboLMC_MKL, self).__init__(variational_strategy)
 
         self.G = G
         self.models = models
