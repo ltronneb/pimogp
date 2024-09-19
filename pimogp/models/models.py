@@ -267,6 +267,7 @@ class DrugComboLMC_MKL(gpytorch.models.ApproximateGP):
         models = torch.nn.ModuleList([DrugComboICM_MKL(**params[i]) for i in range(G)])
 
         variational_strategy = SumVariationalStrategy(models)
+        print("a")
 
         super(DrugComboLMC_MKL, self).__init__(variational_strategy)
 
