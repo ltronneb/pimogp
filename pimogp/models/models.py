@@ -109,10 +109,10 @@ class DrugComboICM_NC(ApproximateGP):
                       inducing_weights=self.inducing_weights, vardistr=self.vardistr)
 
 
-class DrugComboICM_Full(ApproximateGP):
+class DrugComboICM_MKL(ApproximateGP):
     r"""
     DrugComboModelNC is a model for drug combination prediction that utilizes drug covariates as well as
-    cell line covariates
+    cell line covariates via Multiple Kernel Learning
 
     It wraps a PermutationInvariantVariationalStrategy in an OutputCovarianceVariationalStrategy for a
     permutation invariant ICM which learns the parameters of the ICM from cell line information
