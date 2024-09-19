@@ -269,8 +269,6 @@ class DrugComboLMC_MKL(gpytorch.models.ApproximateGP):
         variational_strategy = SumVariationalStrategy(models)
 
 
-
-
         super(DrugComboLMC_MKL, self).__init__(variational_strategy)
 
         self.G = G
