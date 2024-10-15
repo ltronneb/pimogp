@@ -3,3 +3,6 @@ jaxtyping~=0.2.9
 setuptools>=70.0.0
 torch>=1.11
 gpytorch~=1.11
+linear-operator~=0.5.2
+matplotlib~=3.8.4
+tqdm~=4.66.4
