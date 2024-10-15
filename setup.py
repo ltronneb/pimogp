@@ -9,6 +9,8 @@ setup(
     version='0.0.1',
     packages=find_packages("."),
     install_requires=requirements,
+    include_package_data=True,
+    package_data={'pimogp': ['data/*']},
     url='',
     license='',
     author='leiv',
