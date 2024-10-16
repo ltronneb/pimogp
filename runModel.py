@@ -1,3 +1,4 @@
+from os import abort
 from typing import Literal, Optional, List
 from matplotlib import pyplot as plt
 import gpytorch
@@ -7,7 +8,7 @@ from gpytorch.mlls import VariationalELBO
 from torch import Tensor
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import TensorDataset, WeightedRandomSampler, DataLoader
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 from pimogp.models.models import DrugComboLMC_NC, DrugComboLMC_MKL
 from pimogp.utils.utils import better_varelbo_init
@@ -15,13 +16,38 @@ from pimogp.utils.utils import better_varelbo_init
 
 def runmodel(x_train: Tensor, y_train: Tensor,
              y_noise: Tensor, y_weights: Tensor,
-             train_indices: Tensor, test_indices: Tensor, cell_covars: Optional[Tensor],
-             x_test: Tensor, pred_target: Literal["viability","latent"],
+             train_indices: Tensor, cell_covars: Optional[List[Tensor]],
+             x_test: Tensor, test_indices: Tensor,
+             pred_target: Literal["viability","latent"],
              G: int, num_latents: int, num_inducing: int, batch_size: int,
              num_tasks: int, model_type: Literal["nc", "mkl"], num_epochs: int,
              vardistr: Literal["mf","nat","chol"],
              weighted: bool, fname: chr):
+    print("INSIDE RUNMODEL!!!")
+    #exit()
+    """
 
+    @param x_train: X locations of the training dataset
+    @param y_train: y targets of the training dataset
+    @param y_noise: noise associated with each observation
+    @param y_weights: weights associated to sample minibatches
+    @param train_indices: output index for the training dataset
+    @param cell_covars: covariates for the cell lines, should be a list of tensors
+    @param x_test: X locations of the test set, where to predict
+    @param test_indices: output index for the test dataset
+    @param pred_target: what the prediction target is, viability or the latent GP
+    @param G: Number of components in the LMC
+    @param num_latents: Number of latent functions per G
+    @param num_inducing: Number of inducing points per latent function
+    @param batch_size: Size of the minibatches
+    @param num_tasks: Number of tasks to predict (no of cell lines)
+    @param model_type: Which model we are using, MKL or NC?
+    @param num_epochs: Number of epochs for training
+    @param vardistr: Type of variational distribution
+    @param weighted: Are we weighting observations by their noise?
+    @param fname: Unique string to save models and plots
+    @return:
+    """
     # Set the device if cuda is available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -32,7 +58,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     y_weights = y_weights.to(device)
     train_indices = train_indices.to(device)
     test_indices = test_indices.to(device)
-    cell_covars = cell_covars.to(device)
+    if cell_covars is not None:
+        cell_covars = [cell_covar.to(device) for cell_covar in cell_covars]
     x_test = x_test.to(device)
 
     # First thing we do is set up minibatching
@@ -137,7 +164,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
 
     # Training!
     with gpytorch.settings.cholesky_max_tries(12):
-        epochs_iter = tqdm(range(num_epochs),desh="Epoch")
+        epochs_iter = tqdm(range(num_epochs),desc="Epoch")
         for i in epochs_iter:
             # Within each iteration, we will go over each minibatch of data
             minibatch_iter = tqdm(train_loader, desc="Minibatch", leave=False)
@@ -186,13 +213,19 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     yhat = []
     with torch.no_grad(), gpytorch.settings.cholesky_max_tries(12):
         minibatch_iter = tqdm(test_loader,desc="Minibatch", leave=False)
-        for y_batch, x_batch, task_batch in minibatch_iter:
+        for x_batch, task_batch in minibatch_iter:
             predictions = likelihood(model(x_batch, task_indices=task_batch))
             mean = predictions.mean
             yhat.append(mean)
 
+    yhat_vector = torch.cat(yhat, 0)
+
+    # Will also save the model here
+    torch.save(model.state_dict(),"model_"+fname)
+    torch.save(likelihood.state_dict(),"likelihood"+fname)
+
     # Now return the prediction
-    return torch.tensor(yhat)
+    return yhat_vector.clone().detach()
 
 
 
