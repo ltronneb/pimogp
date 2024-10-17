@@ -85,8 +85,7 @@ def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: L
     # Adding an indicator for the cell_lines (tasks)
     data["task_index"] = pd.Categorical(data['cell_line']).codes
 
-    #
-    print("check1")
+
 
     # Split according to the various settings
     if setting == "LTO":
@@ -177,9 +176,10 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
     Path("results/models/"+setting).mkdir(parents=True,exist_ok=True)
     # Fetch a train_test split of the data
     data, train, test, ids = train_test_split_drugdata(input_type=input_type,dataset=dataset,setting=setting,seed=seed)
-
+    #exit()
     # Pull out the actual validation dataset
-    y_test, X_test, test_index, test_noise, test_weights = prepdata(test,targets,predtarget)
+    # y_test, X_test, test_index, test_noise, test_weights = prepdata(test,targets,predtarget)
+    # Commented out because it is never actually used here
 
     # Create the unique character string we'll use for later
     fname = "{0}{1}_data={2}_input={3}_target={4}_weighted={5}vardistr={6}_batchsize={7}_epochs={8}".format(setting,
@@ -221,10 +221,11 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
 
                     # Now we write this to a csv file
                     rmse = (cv_y_test - yhat).square().mean().sqrt()
+                    wrmse = (cv_y_test - yhat).square().mul(cv_test_weights).sum().div(cv_test_weights.sum()).sqrt()
                     write_to_csv("cv_results.csv",
-                                 ["Setting", "Data", "input", "target", "G", "num_latent", "num_inducing", "fold","RMSE"],
-                                 [setting, dataset, input_type, predtarget, str(g), str(n_latent), str(n_inducing),
-                                  str(fold), str(rmse.item())])
+                                 ["Setting", "Model", "Data", "input", "target", "weighted", "G", "num_latent", "num_inducing", "fold","RMSE", "wRMSE"],
+                                 [setting, model_type, dataset, input_type, predtarget, weighted, str(g), str(n_latent), str(n_inducing),
+                                  str(fold), str(rmse.item()), str(wrmse.item())])
 
                     fold = fold + 1
 
@@ -237,13 +238,14 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
 
 if __name__ == '__main__':
     # Create arg parser
-    #nparser = argparse.ArgumentParser(prog='cv',
-    #                                  description="Perform cross validation")
-    print("hello world")
-    cross_validate(input_type="raw", predtarget="viability",
+    nparser = argparse.ArgumentParser(prog='cv',
+                                      description="Perform 5-fold cross validation for model hypers")
+
+
+    cross_validate(input_type="processed", predtarget="latent",
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
-                   weighted=False,
+                   weighted=True,
                    G=[1], num_latents=[1], num_inducing=[10],
                    batch_size=256, num_epochs=1, seed=123)
 
