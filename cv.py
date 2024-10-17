@@ -121,7 +121,7 @@ def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: L
         test = test[test['_merge'] == 'left_only']
         # Drop the merge indicator column
         test = test.drop(columns=['_merge'])
-        # We wont use the ids in this setting but return one anyway
+        # We won't use the ids in this setting but return one anyway
         ids = 1
     if setting == "LCO":
         data["id"] = data.cell_line.map(str)
@@ -169,7 +169,12 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
         elif predtarget == "latent":
             targets = "GPMean"
 
-
+    # Message
+    print("Performing 5-fold cross validation!")
+    print("Over: G=" + str(G) + " num_latent=" + str(num_latents) + " num_inducing=" + str(num_inducing))
+    print("Model: " + model_type)
+    print("Dataset: " + dataset)
+    print("Using " + input_type + " data, with " + predtarget + " as target.")
 
     # Create some directories if they do not exist
     Path("results/plots/"+setting).mkdir(parents=True, exist_ok=True)
@@ -194,12 +199,15 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
 
     # Now for the cross-validation itself:
     gkf = GroupKFold(n_splits=5)
-    fold = 1
+
     for g in G:
         for n_latent in num_latents:
             for n_inducing in num_inducing:
+                fold = 1
                 for train_idx, test_idx in (
                 gkf.split(train, groups=ids) if setting != "LDO" else LDO_CV_split(train, gkf)):
+                    # Message
+                    print("G=" + str(g) + ", num_latent=" + str(n_latent) + ", num_inducing=" + str(n_inducing) + " fold=" + str(fold))
                     # Pull out the data
                     cv_y_train, cv_X_train, cv_train_indices, cv_train_noise, cv_train_weights = prepdata(
                         train.iloc[train_idx], targets, predtarget)
@@ -219,9 +227,12 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                                         fname, str(g), str(n_latent), str(n_inducing), str(fold)),
                                     setting=setting)
 
-                    # Now we write this to a csv file
+                    # Move this to the same device as cv_y_test
+                    yhat = yhat.to(cv_y_test.device)
+                    # Calculate errors
                     rmse = (cv_y_test - yhat).square().mean().sqrt()
                     wrmse = (cv_y_test - yhat).square().mul(cv_test_weights).sum().div(cv_test_weights.sum()).sqrt()
+                    # Now we write this to a csv file
                     write_to_csv("cv_results.csv",
                                  ["Setting", "Model", "Data", "input", "target", "weighted", "G", "num_latent", "num_inducing", "fold","RMSE", "wRMSE"],
                                  [setting, model_type, dataset, input_type, predtarget, weighted, str(g), str(n_latent), str(n_inducing),
@@ -241,13 +252,35 @@ if __name__ == '__main__':
     nparser = argparse.ArgumentParser(prog='cv',
                                       description="Perform 5-fold cross validation for model hypers")
 
-
-    cross_validate(input_type="processed", predtarget="latent",
+    nparser.add_argument('--input_type', type=str, help='Which input type to use, processed or raw')
+    nparser.add_argument('--predtarget', type=str, help='Which target to use, latent or viability')
+    nparser.add_argument('--dataset', type=str, help='Which dataset to use, ONeil')
+    nparser.add_argument('--setting', type=str, help='Which setting to predict in, LTO, LPO, LDO, LCO')
+    nparser.add_argument('--model_type', type=str, help='Which model to use, nc or mkl')
+    nparser.add_argument('--vardistr', type=str, help='Which type of variational distribution to use, mf, nat, chol')
+    nparser.add_argument('--weighted', type=bool, help='Weighting observations by noise?')
+    nparser.add_argument('--G', type=int, nargs='+', help='Which values of G to CV over?')
+    nparser.add_argument('--num_latent', type=int, nargs='+', help='Which values of num_latent to CV over?')
+    nparser.add_argument('--num_inducing', type=int, nargs='+', help='Which values of num_inducing to CV over?')
+    nparser.add_argument('--batch_size', type=int, help='Batch size')
+    nparser.add_argument('--num_epochs', type=int, help='No. of epochs')
+    nparser.add_argument('--seed', type=int, help='Random seed')
+    nparser.set_defaults(input_type="processed", predtarget="latent",
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
                    weighted=True,
                    G=[1], num_latents=[1], num_inducing=[10],
                    batch_size=256, num_epochs=1, seed=123)
+
+    args = nparser.parse_args()
+
+
+    cross_validate(input_type=args.input_type, predtarget=args.predtarget,
+                   dataset=args.dataset, setting= args.setting,
+                   model_type=args.model_type, vardistr=args.vardistr,
+                   weighted=args.weighted,
+                   G=args.G, num_latents=args.num_latents, num_inducing=args.num_inducing,
+                   batch_size=args.batch_size, num_epochs=args.num_epochs, seed=args.seed)
 
 
 

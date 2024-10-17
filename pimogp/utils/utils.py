@@ -30,8 +30,8 @@ def better_varelbo_init(x, y, noise, task_indices, model, likelihood, num_inits=
                 newloss = -newmll(newoutput, y)
             # If this loss is better overwrite
             if newloss.item() < loss.item():
-                print("Old loss: ", loss.item())
-                print("New loss: ", newloss.item())
+                #print("Old loss: ", loss.item())
+                #print("New loss: ", newloss.item())
                 model = deepcopy(newmodel)
                 loss = deepcopy(newloss)
 

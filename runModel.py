@@ -24,7 +24,6 @@ def runmodel(x_train: Tensor, y_train: Tensor,
              vardistr: Literal["mf","nat","chol"],
              weighted: bool, fname: chr, setting:chr):
     """
-
     @param x_train: X locations of the training dataset
     @param y_train: y targets of the training dataset
     @param y_noise: noise associated with each observation
@@ -44,6 +43,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     @param vardistr: Type of variational distribution
     @param weighted: Are we weighting observations by their noise?
     @param fname: Unique string to save models and plots
+    @param setting: Which setting are we predicting for?
     @return:
     """
     # Set the device if cuda is available
@@ -159,7 +159,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     train_loss = []
 
 
-
+    print("Training starting!")
     # Training!
     with gpytorch.settings.cholesky_max_tries(12):
         epochs_iter = tqdm(range(num_epochs),desc="Epoch")
@@ -209,6 +209,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     model.eval()
     likelihood.eval()
     yhat = []
+    print("Predicting at test inputs")
     with torch.no_grad(), gpytorch.settings.cholesky_max_tries(12):
         minibatch_iter = tqdm(test_loader,desc="Minibatch", leave=False)
         for x_batch, task_batch in minibatch_iter:
