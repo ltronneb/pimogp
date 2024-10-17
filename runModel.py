@@ -47,7 +47,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     @return:
     """
     # Set the device if cuda is available
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if  torch.backends.mps.is_available() else "cpu")
 
     # And move everything to this device if needed
     x_train = x_train.to(device)
@@ -73,8 +74,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     permutation = torch.cat([torch.tensor([1]), torch.tensor([0]),
                              torch.linspace((2 + 50), 1 + (2 * 50), 50), torch.linspace(2, 1 + 50, 50)]).long()
     permutation = permutation.to(device)
-    conc_dims = torch.tensor([0, 1])
-    drug_dims = torch.linspace(2, 2 * 50 + 1, 2 * 50).long()
+    conc_dims = torch.tensor([0, 1],device=device)
+    drug_dims = torch.linspace(2, 2 * 50 + 1, 2 * 50,device=device).long()
 
 
     # Parameters for the model
@@ -94,7 +95,6 @@ def runmodel(x_train: Tensor, y_train: Tensor,
 
     # Set up G models with these parameters
     params = [param_dict.copy() for i in range(G)]
-
     # Now initialise models
     model = None
     likelihood = None
@@ -114,17 +114,26 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     if likelihood is None:
         raise ValueError("Likelihood is not initialised")
 
+    # Now here also move model and likelihood to GPU if this hasn't been done automatically
+    model = model.to(device)
+    likelihood = likelihood.to(device)
+    #print(next(model.parameters()).device)
+
     # Here we try to reinitialise the model in an attempt to get find a better position for inducing points
     idx = y_weights.multinomial(num_samples=1000, replacement=False)
     X_mll = x_train[idx]
     y_mll = y_train[idx]
     noise_mll = y_noise[idx]
     task_indices_mll = train_indices[idx]
+
+    # Try this now first
+    model.train()
+    #output = model(X_mll,task_indices=task_indices_mll)
+    #exit()
+
     model, likelihood = better_varelbo_init(X_mll, y_mll, noise_mll, task_indices_mll, model, likelihood)
 
-    # Now here also move model and likelihood to GPU if this hasn't been done automatically
-    model = model.to(device)
-    likelihood = likelihood.to(device)
+
 
     # Now model training
     model.train()
