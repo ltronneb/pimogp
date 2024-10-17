@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 from typing import Literal, List
 
 import numpy as np
@@ -30,7 +31,7 @@ def prepdata(dataset,targets,predtarget):
 
 
 # Need a custom splitter for the LPO setting
-def LPO_CV_split(train: pd.DataFrame, gkf: GroupKFold):
+def LDO_CV_split(train: pd.DataFrame, gkf: GroupKFold):
     drugs = np.unique(np.concatenate([train["drugA"].unique(),train["drugB"].unique()]))
     # Set up a list here
     idx_list = []
@@ -153,6 +154,12 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
             targets = "fMean"
         elif predtarget == "latent":
             targets = "GPMean"
+
+
+
+    # Create some directories if they do not exist
+    Path("results/plots/"+setting).mkdir(parents=True, exist_ok=True)
+    Path("results/models/"+setting).mkdir(parents=True,exist_ok=True)
     # Fetch a train_test split of the data
     data, train, test, ids = train_test_split_drugdata(input_type=input_type,dataset=dataset,setting=setting,seed=seed)
 
@@ -172,7 +179,13 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
     # Now for the cross-validation itself:
     gkf = GroupKFold(n_splits=5)
     fold = 1
-    for train_idx, test_idx in (gkf.split(train, groups=ids) if setting != "LPO" else LPO_CV_split(train, gkf)):
+    for g in G:
+        for n_latent in num_latents:
+            for n_inducing in num_inducing:
+                print("a")
+
+
+    for train_idx, test_idx in (gkf.split(train, groups=ids) if setting != "LDO" else LDO_CV_split(train, gkf)):
         # Pull out the data
         cv_y_train, cv_X_train, cv_train_indices, cv_train_noise, cv_train_weights = prepdata(train.iloc[train_idx],targets,predtarget)
         cv_y_test, cv_X_test, cv_test_indices, cv_test_noise, cv_test_weights = prepdata(train.iloc[test_idx],targets,predtarget)
@@ -185,7 +198,7 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                         G=G[0], num_latents=num_latents[0], num_inducing=num_inducing[0], batch_size=batch_size,
                         num_tasks=data.task_index.max() + 1, model_type=model_type, num_epochs=num_epochs,
                         vardistr=vardistr, weighted=weighted, fname="{0}_G={1}_num_latent={2}_num_inducing={3}_cvfold{4}".format(
-                fname, str(G[0]), str(num_latents), str(num_inducing), str(fold)))
+                fname, str(G[0]), str(num_latents), str(num_inducing), str(fold)),setting=setting)
 
         # Print out RMSE for example
         rmse = (cv_y_test-yhat).square().mean().sqrt()
@@ -201,10 +214,10 @@ if __name__ == '__main__':
     #nparser = argparse.ArgumentParser(prog='cv',
     #                                  description="Perform cross validation")
     print("hello world")
-    cross_validate(input_type="processed", predtarget="latent",
+    cross_validate(input_type="raw", predtarget="viability",
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
-                   weighted=True,
+                   weighted=False,
                    G=[1], num_latents=[1], num_inducing=[10],
                    batch_size=256, num_epochs=1, seed=123)
 
