@@ -23,8 +23,6 @@ def runmodel(x_train: Tensor, y_train: Tensor,
              num_tasks: int, model_type: Literal["nc", "mkl"], num_epochs: int,
              vardistr: Literal["mf","nat","chol"],
              weighted: bool, fname: chr, setting:chr):
-    print("INSIDE RUNMODEL!!!")
-    #exit()
     """
 
     @param x_train: X locations of the training dataset
