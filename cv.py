@@ -265,7 +265,7 @@ if __name__ == '__main__':
     nparser.add_argument('--batch_size', type=int, help='Batch size')
     nparser.add_argument('--num_epochs', type=int, help='No. of epochs')
     nparser.add_argument('--seed', type=int, help='Random seed')
-    nparser.set_defaults(input_type="processing", predtarget="latent",
+    nparser.set_defaults(input_type="processed", predtarget="latent",
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
                    weighted=True,
