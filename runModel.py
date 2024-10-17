@@ -72,8 +72,10 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     # First set up the permutation and the dimensions needed
     permutation = torch.cat([torch.tensor([1]), torch.tensor([0]),
                              torch.linspace((2 + 50), 1 + (2 * 50), 50), torch.linspace(2, 1 + 50, 50)]).long()
+    permutation = permutation.to(device)
     conc_dims = torch.tensor([0, 1])
     drug_dims = torch.linspace(2, 2 * 50 + 1, 2 * 50).long()
+
 
     # Parameters for the model
     param_dict = {"permutation": permutation,
