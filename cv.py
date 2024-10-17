@@ -1,4 +1,6 @@
 import argparse
+import csv
+import os
 from pathlib import Path
 from typing import Literal, List
 
@@ -134,6 +136,19 @@ def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: L
     return data, train, test, ids
 
 
+def write_to_csv(filename, header, data):
+    # Check if the file exists to decide whether to write the header
+    file_exists = os.path.isfile(filename)
+
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+
+        # Write the header only if the file does not exist
+        if not file_exists:
+            writer.writerow(header)
+
+        # Write the data rows
+        writer.writerow(data)
 
 
 
@@ -176,34 +191,45 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                                                                                                             vardistr,
                                                                                                             str(batch_size),
                                                                                                             str(num_epochs))
+
     # Now for the cross-validation itself:
     gkf = GroupKFold(n_splits=5)
     fold = 1
     for g in G:
         for n_latent in num_latents:
             for n_inducing in num_inducing:
-                print("a")
+                for train_idx, test_idx in (
+                gkf.split(train, groups=ids) if setting != "LDO" else LDO_CV_split(train, gkf)):
+                    # Pull out the data
+                    cv_y_train, cv_X_train, cv_train_indices, cv_train_noise, cv_train_weights = prepdata(
+                        train.iloc[train_idx], targets, predtarget)
+                    cv_y_test, cv_X_test, cv_test_indices, cv_test_noise, cv_test_weights = prepdata(
+                        train.iloc[test_idx], targets, predtarget)
+                    # Train model and predict
+                    yhat = runmodel(x_train=cv_X_train, y_train=cv_y_train,
+                                    y_noise=cv_train_noise, y_weights=cv_train_weights,
+                                    train_indices=cv_train_indices, cell_covars=None,  # TODO fix cell covars
+                                    x_test=cv_X_test, test_indices=cv_test_indices,
+                                    pred_target=predtarget,
+                                    G=g, num_latents=n_latent, num_inducing=n_inducing,
+                                    batch_size=batch_size,
+                                    num_tasks=data.task_index.max() + 1, model_type=model_type, num_epochs=num_epochs,
+                                    vardistr=vardistr, weighted=weighted,
+                                    fname="{0}_G={1}_num_latent={2}_num_inducing={3}_cvfold{4}".format(
+                                        fname, str(g), str(n_latent), str(n_inducing), str(fold)),
+                                    setting=setting)
+
+                    # Now we write this to a csv file
+                    rmse = (cv_y_test - yhat).square().mean().sqrt()
+                    write_to_csv("cv_results.csv",
+                                 ["Setting", "Data", "input", "target", "G", "num_latent", "num_inducing", "fold","RMSE"],
+                                 [setting, dataset, input_type, predtarget, str(g), str(n_latent), str(n_inducing),
+                                  str(fold), str(rmse.item())])
+
+                    fold = fold + 1
 
 
-    for train_idx, test_idx in (gkf.split(train, groups=ids) if setting != "LDO" else LDO_CV_split(train, gkf)):
-        # Pull out the data
-        cv_y_train, cv_X_train, cv_train_indices, cv_train_noise, cv_train_weights = prepdata(train.iloc[train_idx],targets,predtarget)
-        cv_y_test, cv_X_test, cv_test_indices, cv_test_noise, cv_test_weights = prepdata(train.iloc[test_idx],targets,predtarget)
-        # Train model and predict
-        yhat = runmodel(x_train=cv_X_train, y_train=cv_y_train,
-                        y_noise=cv_train_noise, y_weights=cv_train_weights,
-                        train_indices=cv_train_indices, cell_covars=None,  #TODO fix cell covars
-                        x_test=cv_X_test, test_indices=cv_test_indices,
-                        pred_target=predtarget,
-                        G=G[0], num_latents=num_latents[0], num_inducing=num_inducing[0], batch_size=batch_size,
-                        num_tasks=data.task_index.max() + 1, model_type=model_type, num_epochs=num_epochs,
-                        vardistr=vardistr, weighted=weighted, fname="{0}_G={1}_num_latent={2}_num_inducing={3}_cvfold{4}".format(
-                fname, str(G[0]), str(num_latents), str(num_inducing), str(fold)),setting=setting)
 
-        # Print out RMSE for example
-        rmse = (cv_y_test-yhat).square().mean().sqrt()
-        print(rmse)
-        fold = fold + 1
 
 
 
