@@ -22,7 +22,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
              G: int, num_latents: int, num_inducing: int, batch_size: int,
              num_tasks: int, model_type: Literal["nc", "mkl"], num_epochs: int,
              vardistr: Literal["mf","nat","chol"],
-             weighted: bool, fname: chr):
+             weighted: bool, fname: chr, setting:chr):
     print("INSIDE RUNMODEL!!!")
     #exit()
     """
@@ -201,7 +201,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
                 scheduler_variational.step()
 
     # Saving a plot of the training loss
-    plot_loss(train_loss,fname)
+    plot_loss(train_loss,fname,setting)
 
     # Now predict also in minibatch
     test_dataset = TensorDataset( x_test, test_indices)
@@ -221,15 +221,15 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     yhat_vector = torch.cat(yhat, 0)
 
     # Will also save the model here
-    torch.save(model.state_dict(),"model_"+fname)
-    torch.save(likelihood.state_dict(),"likelihood"+fname)
+    torch.save(model.state_dict(),"results/models/"+setting+"/model_"+fname)
+    torch.save(likelihood.state_dict(),"results/models/"+setting+"/likelihood"+fname)
 
     # Now return the prediction
     return yhat_vector.clone().detach()
 
 
 
-def plot_loss(train_loss: List,filename: chr):
+def plot_loss(train_loss: List,filename: chr,setting: chr):
     # Calculate a shift constant
     min_loss = min(train_loss)
     shift = abs(min_loss) + 1e-6  # Adding a small epsilon to avoid log(0)
@@ -246,6 +246,6 @@ def plot_loss(train_loss: List,filename: chr):
     plt.legend()  # Show legend
     plt.grid(True)  # Add grid for better readability
     # plt.show()  # Display the plot
-    fname = "loss_" + filename + ".png"
+    fname = "results/plots/" + setting + "/loss_" + filename + ".png"
     plt.savefig(fname, format='png', dpi=300, bbox_inches='tight')
     plt.close()
