@@ -248,3 +248,4 @@ def plot_loss(train_loss: List,filename: chr):
     # plt.show()  # Display the plot
     fname = "loss_" + filename + ".png"
     plt.savefig(fname, format='png', dpi=300, bbox_inches='tight')
+    plt.close()

@@ -51,16 +51,9 @@ def LPO_CV_split(train: pd.DataFrame, gkf: GroupKFold):
     return idx_list
 
 
-
-
-def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["viability", "latent"],
-                   dataset: Literal["ONeil"], setting: Literal["LTO", "LPO", "LDO", "LCO"],
-                   model_type: Literal["nc", "mkl"], vardistr: Literal["mf","nat","chol"],
-                   weighted: bool,
-                   G: List[int], num_latents: List[int], num_inducing: List[int],
-                   batch_size: int=256, num_epochs: int=12, seed: int=123):
-
-    # Read in the data
+def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: Literal["ONeil"],
+                              setting: Literal["LTO", "LPO", "LDO", "LCO"],
+                     seed: int=123):
     with as_file(files('pimogp.data.ONeil').joinpath('drug_latents.csv')) as f:
         drugs = pd.read_csv(f)
     if dataset == "ONeil":
@@ -126,6 +119,8 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
         test = test[test['_merge'] == 'left_only']
         # Drop the merge indicator column
         test = test.drop(columns=['_merge'])
+        # We wont use the ids in this setting but return one anyway
+        ids = 1
     if setting == "LCO":
         data["id"] = data.cell_line.map(str)
         train_id, test_id = train_test_split(pd.DataFrame(data.id.unique()), test_size=0.2, random_state=seed)
@@ -135,6 +130,20 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
         ids = train["id"]
         train = train.drop(columns=["id"])
         test = test.drop(columns=["id"])
+    return data, train, test, ids
+
+
+
+
+
+
+
+def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["viability", "latent"],
+                   dataset: Literal["ONeil"], setting: Literal["LTO", "LPO", "LDO", "LCO"],
+                   model_type: Literal["nc", "mkl"], vardistr: Literal["mf","nat","chol"],
+                   weighted: bool,
+                   G: List[int], num_latents: List[int], num_inducing: List[int],
+                   batch_size: int=256, num_epochs: int=12, seed: int=123):
 
     # Define what the targets are
     if input_type == "raw":
@@ -144,11 +153,12 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
             targets = "fMean"
         elif predtarget == "latent":
             targets = "GPMean"
+    # Fetch a train_test split of the data
+    data, train, test, ids = train_test_split_drugdata(input_type=input_type,dataset=dataset,setting=setting,seed=seed)
 
-    print("check2")
     # Pull out the actual validation dataset
     y_test, X_test, test_index, test_noise, test_weights = prepdata(test,targets,predtarget)
-    print("check3")
+
     # Create the unique character string we'll use for later
     fname = "{0}{1}_data={2}_input={3}_target={4}_weighted={5}vardistr={6}_batchsize={7}_epochs={8}".format(setting,
                                                                                                             model_type,
@@ -159,19 +169,14 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                                                                                                             vardistr,
                                                                                                             str(batch_size),
                                                                                                             str(num_epochs))
-    print("check4")
     # Now for the cross-validation itself:
     gkf = GroupKFold(n_splits=5)
     fold = 1
     for train_idx, test_idx in (gkf.split(train, groups=ids) if setting != "LPO" else LPO_CV_split(train, gkf)):
         # Pull out the data
-        print("INSIDE the loop!!!")
-        print(train.iloc[train_idx])
-        #exit()
         cv_y_train, cv_X_train, cv_train_indices, cv_train_noise, cv_train_weights = prepdata(train.iloc[train_idx],targets,predtarget)
         cv_y_test, cv_X_test, cv_test_indices, cv_test_noise, cv_test_weights = prepdata(train.iloc[test_idx],targets,predtarget)
         # Train model and predict
-        print("check5")
         yhat = runmodel(x_train=cv_X_train, y_train=cv_y_train,
                         y_noise=cv_train_noise, y_weights=cv_train_weights,
                         train_indices=cv_train_indices, cell_covars=None,  #TODO fix cell covars
@@ -200,7 +205,7 @@ if __name__ == '__main__':
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
                    weighted=True,
-                   G=[1], num_latents=[1], num_inducing=[100],
+                   G=[1], num_latents=[1], num_inducing=[10],
                    batch_size=256, num_epochs=1, seed=123)
 
 
