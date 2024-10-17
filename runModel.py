@@ -47,8 +47,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     @return:
     """
     # Set the device if cuda is available
-    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    device = torch.device("mps" if  torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("mps" if  torch.backends.mps.is_available() else "cpu")
 
     # And move everything to this device if needed
     x_train = x_train.to(device)
