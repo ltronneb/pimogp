@@ -260,7 +260,7 @@ if __name__ == '__main__':
     nparser.add_argument('--vardistr', type=str, help='Which type of variational distribution to use, mf, nat, chol')
     nparser.add_argument('--weighted', type=bool, help='Weighting observations by noise?')
     nparser.add_argument('--G', type=int, nargs='+', help='Which values of G to CV over?')
-    nparser.add_argument('--num_latent', type=int, nargs='+', help='Which values of num_latent to CV over?')
+    nparser.add_argument('--num_latents', type=int, nargs='+', help='Which values of num_latent to CV over?')
     nparser.add_argument('--num_inducing', type=int, nargs='+', help='Which values of num_inducing to CV over?')
     nparser.add_argument('--batch_size', type=int, help='Batch size')
     nparser.add_argument('--num_epochs', type=int, help='No. of epochs')
@@ -269,7 +269,7 @@ if __name__ == '__main__':
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
                    weighted=True,
-                   G=[1], num_latents=[1], num_inducing=[10],
+                   G=[2], num_latents=[10], num_inducing=[50],
                    batch_size=256, num_epochs=1, seed=123)
 
     args = nparser.parse_args()
