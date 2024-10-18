@@ -7,7 +7,7 @@ import torch
 
 
 def better_varelbo_init(x, y, noise, task_indices, model, likelihood, num_inits=100):
-    print("Trying to find a better initialization in: " + str(num_inits) + "attempts!")
+    print("Trying to find a better initialization in " + str(num_inits) + " attempts!")
     with torch.no_grad():
         device = next(model.parameters()).device # Need to make sure everything stays on the same device
         #print("before reinit")
