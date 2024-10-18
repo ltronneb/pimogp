@@ -22,7 +22,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
              G: int, num_latents: int, num_inducing: int, batch_size: int,
              num_tasks: int, model_type: Literal["nc", "mkl"], num_epochs: int,
              vardistr: Literal["mf","nat","chol"],
-             weighted: bool, fname: chr, setting:chr):
+             weighted: bool, fname: chr, setting:chr,
+             num_inits: int=10):
     """
     @param x_train: X locations of the training dataset
     @param y_train: y targets of the training dataset
@@ -44,11 +45,13 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     @param weighted: Are we weighting observations by their noise?
     @param fname: Unique string to save models and plots
     @param setting: Which setting are we predicting for?
+    @param num_inits: How many random initialisations to try?
     @return:
     """
     # Set the device if cuda is available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #device = torch.device("mps" if  torch.backends.mps.is_available() else "cpu")
+    print("Device used: " + str(device))
 
     # And move everything to this device if needed
     x_train = x_train.to(device)
@@ -131,7 +134,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     #output = model(X_mll,task_indices=task_indices_mll)
     #exit()
 
-    model, likelihood = better_varelbo_init(X_mll, y_mll, noise_mll, task_indices_mll, model, likelihood)
+    model, likelihood = better_varelbo_init(X_mll, y_mll, noise_mll, task_indices_mll, model, likelihood,num_inits=num_inits)
 
 
 
