@@ -158,7 +158,8 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                    model_type: Literal["nc", "mkl"], vardistr: Literal["mf","nat","chol"],
                    weighted: bool,
                    G: List[int], num_latents: List[int], num_inducing: List[int],
-                   batch_size: int=256, num_epochs: int=12, seed: int=123):
+                   batch_size: int=256, num_epochs: int=12, seed: int=123,
+                   num_inits: int=10):
 
     # Define what the targets are
     if input_type == "raw":
@@ -225,7 +226,7 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                                     vardistr=vardistr, weighted=weighted,
                                     fname="{0}_G={1}_num_latent={2}_num_inducing={3}_cvfold{4}".format(
                                         fname, str(g), str(n_latent), str(n_inducing), str(fold)),
-                                    setting=setting)
+                                    setting=setting,num_inits=num_inits)
 
                     # Move this to the same device as cv_y_test
                     yhat = yhat.to(cv_y_test.device)
@@ -265,12 +266,13 @@ if __name__ == '__main__':
     nparser.add_argument('--batch_size', type=int, help='Batch size')
     nparser.add_argument('--num_epochs', type=int, help='No. of epochs')
     nparser.add_argument('--seed', type=int, help='Random seed')
+    nparser.add_argument('--num_inits', type=int, help='How many random initialisations?')
     nparser.set_defaults(input_type="processed", predtarget="latent",
                    dataset="ONeil", setting= "LTO",
                    model_type="nc", vardistr="mf",
                    weighted=True,
                    G=[2], num_latents=[10], num_inducing=[50],
-                   batch_size=256, num_epochs=1, seed=123)
+                   batch_size=256, num_epochs=1, seed=123, num_inits=10)
 
     args = nparser.parse_args()
 
@@ -280,7 +282,7 @@ if __name__ == '__main__':
                    model_type=args.model_type, vardistr=args.vardistr,
                    weighted=args.weighted,
                    G=args.G, num_latents=args.num_latents, num_inducing=args.num_inducing,
-                   batch_size=args.batch_size, num_epochs=args.num_epochs, seed=args.seed)
+                   batch_size=args.batch_size, num_epochs=args.num_epochs, seed=args.seed, num_inits=args.num_inits)
 
 
 
