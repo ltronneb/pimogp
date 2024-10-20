@@ -17,15 +17,15 @@ from importlib.resources import files, as_file
 from runModel import runmodel
 
 def prepdata(dataset,targets,predtarget):
-    y = torch.tensor(dataset[targets].values).float()
+    y = torch.tensor(dataset[targets].values).double()
     conc = dataset[['drugA_conc','drugB_conc']]
     task_indices = torch.tensor(dataset["task_index"].values).long()
     dataset = dataset.drop(columns=["task_index"])
     drugcovars = dataset.iloc[:,-(50*2):]
-    X = torch.tensor(pd.concat([conc,drugcovars],axis=1).values).float()
+    X = torch.tensor(pd.concat([conc,drugcovars],axis=1).values).double()
     # Noise and weights (only really do this when working with the latent GP prediction)
     if predtarget == "latent":
-        noise = torch.tensor(dataset["GPVar"].values).float() # These are for implicitly weighting observations through likelihood
+        noise = torch.tensor(dataset["GPVar"].values).double() # These are for implicitly weighting observations through likelihood
         weights = 1.0/noise # These are for sampling (during minibatching, and sampling inducing points)
     else:
         noise = torch.zeros(y.shape) # Equal weights
