@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Literal, List
 
+import gpytorch.settings
 import numpy as np
 import torch
 from scipy.stats import zscore
@@ -259,7 +260,7 @@ if __name__ == '__main__':
     nparser.add_argument('--setting', type=str, help='Which setting to predict in, LTO, LPO, LDO, LCO')
     nparser.add_argument('--model_type', type=str, help='Which model to use, nc or mkl')
     nparser.add_argument('--vardistr', type=str, help='Which type of variational distribution to use, mf, nat, chol')
-    nparser.add_argument('--weighted', type=bool, help='Weighting observations by noise?')
+    nparser.add_argument('--weighted', type=bool, action=argparse.BooleanOptionalAction, help='Weighting observations by noise?')
     nparser.add_argument('--G', type=int, nargs='+', help='Which values of G to CV over?')
     nparser.add_argument('--num_latents', type=int, nargs='+', help='Which values of num_latent to CV over?')
     nparser.add_argument('--num_inducing', type=int, nargs='+', help='Which values of num_inducing to CV over?')
@@ -277,7 +278,10 @@ if __name__ == '__main__':
     args = nparser.parse_args()
 
 
-    cross_validate(input_type=args.input_type, predtarget=args.predtarget,
+    with (gpytorch.settings.max_root_decomposition_size(2000),
+          gpytorch.settings.fast_computations(covar_root_decomposition=False, log_prob=False, solves=False),
+          gpytorch.settings.linalg_dtypes(torch.float)):
+        cross_validate(input_type=args.input_type, predtarget=args.predtarget,
                    dataset=args.dataset, setting= args.setting,
                    model_type=args.model_type, vardistr=args.vardistr,
                    weighted=args.weighted,
