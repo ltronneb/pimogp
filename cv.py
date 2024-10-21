@@ -236,8 +236,8 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                     wrmse = (cv_y_test - yhat).square().mul(cv_test_weights).sum().div(cv_test_weights.sum()).sqrt()
                     # Now we write this to a csv file
                     write_to_csv("cv_results.csv",
-                                 ["Setting", "Model", "Data", "input", "target", "weighted", "G", "num_latent", "num_inducing", "fold","RMSE", "wRMSE"],
-                                 [setting, model_type, dataset, input_type, predtarget, weighted, str(g), str(n_latent), str(n_inducing),
+                                 ["Setting", "Model", "Data", "input", "target", "weighted", "G", "num_latent", "num_inducing", "num_epochs", "batch_size",  "fold","RMSE", "wRMSE"],
+                                 [setting, model_type, dataset, input_type, predtarget, weighted, str(g), str(n_latent), str(n_inducing), str(num_epochs), str(batch_size),
                                   str(fold), str(rmse.item()), str(wrmse.item())])
 
                     fold = fold + 1
