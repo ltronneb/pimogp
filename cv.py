@@ -273,7 +273,7 @@ if __name__ == '__main__':
                    model_type="nc", vardistr="mf",
                    weighted=True,
                    G=[2], num_latents=[10], num_inducing=[50],
-                   batch_size=256, num_epochs=1, seed=123, num_inits=10)
+                   batch_size=256, num_epochs=4, seed=123, num_inits=10)
 
     args = nparser.parse_args()
 
