@@ -1,3 +1,5 @@
 .csv filter=lfs diff=lfs merge=lfs -text
 *.csv filter=lfs diff=lfs merge=lfs -text
 pimogp/data/ONeil/processed.csv filter=lfs diff=lfs merge=lfs -text
+pimogp/data/GDSC_7x7/raw.csv filter=lfs diff=lfs merge=lfs -text
+pimogp/data/GDSC_7x7/drug_latents.csv filter=lfs diff=lfs merge=lfs -text

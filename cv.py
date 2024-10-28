@@ -28,9 +28,8 @@ def prepdata(dataset,targets,predtarget):
         noise = torch.tensor(dataset["GPVar"].values).float() # These are for implicitly weighting observations through likelihood
         weights = 1.0/noise # These are for sampling (during minibatching, and sampling inducing points)
     else:
-        #noise = torch.zeros(y.shape) # These are for implicitly weighting observations through likelihood
-        noise = torch.tensor(dataset["var"].values).float()  # These are for implicitly weighting observations through likelihood
-        weights = 1.0/(noise + 1) # These are for sampling (during minibatching, and sampling inducing points)
+        noise = torch.zeros(y.shape) # These are for implicitly weighting observations through likelihood
+        weights = 1.0/(noise + 1.0)# These are for sampling (during minibatching, and sampling inducing points)
     return y, X, task_indices, noise, weights
 
 
@@ -59,15 +58,22 @@ def LDO_CV_split(train: pd.DataFrame, gkf: GroupKFold):
 def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: Literal["ONeil"],
                               setting: Literal["LTO", "LPO", "LDO", "LCO"],
                      seed: int=123):
-    with as_file(files('pimogp.data.ONeil').joinpath('drug_latents.csv')) as f:
-        drugs = pd.read_csv(f)
+
     if dataset == "ONeil":
+        with as_file(files('pimogp.data.ONeil').joinpath('drug_latents.csv')) as f:
+            drugs = pd.read_csv(f)
         if input_type == "raw":
             with as_file(files('pimogp.data.ONeil').joinpath('raw.csv')) as f:
                 data = pd.read_csv(f)
         elif input_type == "processed":
             with as_file(files('pimogp.data.ONeil').joinpath('processed.csv')) as f:
                 data = pd.read_csv(f,sep=";")
+    if dataset == "GDSC7x7":
+        with as_file(files('pimogp.data.GDSC_7x7').joinpath('drug_latents.csv')) as f:
+            drugs = pd.read_csv(f)
+        if input_type == "raw":
+            with as_file(files('pimogp.data.GDSC_7x7').joinpath('raw.csv')) as f:
+                data = pd.read_csv(f)
 
     # Processing the data
     X = drugs.iloc[:, 9:]
@@ -156,7 +162,7 @@ def write_to_csv(filename, header, data):
 
 
 def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["viability", "latent"],
-                   dataset: Literal["ONeil"], setting: Literal["LTO", "LPO", "LDO", "LCO"],
+                   dataset: Literal["ONeil","GDSC7x7"], setting: Literal["LTO", "LPO", "LDO", "LCO"],
                    model_type: Literal["nc", "mkl"], vardistr: Literal["mf","nat","chol"],
                    weighted: bool,
                    G: List[int], num_latents: List[int], num_inducing: List[int],
