@@ -23,13 +23,14 @@ def prepdata(dataset,targets,predtarget):
     dataset = dataset.drop(columns=["task_index"])
     drugcovars = dataset.iloc[:,-(50*2):]
     X = torch.tensor(pd.concat([conc,drugcovars],axis=1).values).float()
-    # Noise and weights (only really do this when working with the latent GP prediction)
+    # Noise and weights
     if predtarget == "latent":
         noise = torch.tensor(dataset["GPVar"].values).float() # These are for implicitly weighting observations through likelihood
         weights = 1.0/noise # These are for sampling (during minibatching, and sampling inducing points)
     else:
-        noise = torch.zeros(y.shape) # Equal weights
-        weights = 1.0/(noise + 1)
+        #noise = torch.zeros(y.shape) # These are for implicitly weighting observations through likelihood
+        noise = torch.tensor(dataset["var"].values).float()  # These are for implicitly weighting observations through likelihood
+        weights = 1.0/(noise + 1) # These are for sampling (during minibatching, and sampling inducing points)
     return y, X, task_indices, noise, weights
 
 
@@ -233,7 +234,7 @@ def cross_validate(input_type: Literal["raw","processed"], predtarget: Literal["
                     yhat = yhat.to(cv_y_test.device)
                     # Calculate errors
                     rmse = (cv_y_test - yhat).square().mean().sqrt()
-                    wrmse = (cv_y_test - yhat).square().mul(cv_test_weights).sum().div(cv_test_weights.sum()).sqrt()
+                    wrmse = (cv_y_test - yhat).square().mul(1.0/cv_test_noise).sum().div((1.0/cv_test_noise).sum()).sqrt()
                     # Now we write this to a csv file
                     write_to_csv("cv_results.csv",
                                  ["Setting", "Model", "Data", "input", "target", "weighted", "G", "num_latent", "num_inducing", "num_epochs", "batch_size",  "fold","RMSE", "wRMSE"],
