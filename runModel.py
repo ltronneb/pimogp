@@ -27,8 +27,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     """
     @param x_train: X locations of the training dataset
     @param y_train: y targets of the training dataset
-    @param y_noise: noise associated with each observation
-    @param y_weights: weights associated to sample minibatches
+    @param y_noise: noise associated with each observation, used for replicates or the latent GP
+    @param y_weights: weights associated to sample minibatches and inducing points
     @param train_indices: output index for the training dataset
     @param cell_covars: covariates for the cell lines, should be a list of tensors
     @param x_test: X locations of the test set, where to predict
