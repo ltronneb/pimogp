@@ -8,10 +8,10 @@ from gpytorch.mlls import VariationalELBO
 from torch import Tensor
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import TensorDataset, WeightedRandomSampler, DataLoader
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 
 from pimogp.models.models import DrugComboLMC_NC, DrugComboLMC_MKL
-from pimogp.utils.utils import better_varelbo_init
+from pimogp.utils.utils import better_varelbo_init, plot_loss
 
 
 def runmodel(x_train: Tensor, y_train: Tensor,
@@ -23,7 +23,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
              num_tasks: int, model_type: Literal["nc", "mkl"], num_epochs: int,
              vardistr: Literal["mf","nat","chol"],
              weighted: bool, fname: chr, setting:chr,
-             num_inits: int=10):
+             num_inits: int=10, initial_lr: float=0.01):
     """
     @param x_train: X locations of the training dataset
     @param y_train: y targets of the training dataset
@@ -149,10 +149,10 @@ def runmodel(x_train: Tensor, y_train: Tensor,
         hyperparameter_optimizer = torch.optim.Adam([
             {'params': model.hyperparameters()},
             {'params': likelihood.parameters()},
-        ], lr = 0.01)
+        ], lr = initial_lr)
         variational_ngd_optimizer = gpytorch.optim.NGD(
             model.variational_parameters(),
-            num_data=y_train.size(0), lr=0.1)
+            num_data=y_train.size(0), lr=float(10*initial_lr))
         scheduler_variational = MultiStepLR(variational_ngd_optimizer,
                                             milestones=[int(0.5*num_epochs),int(0.75*num_epochs)],
                                             gamma=0.1)
@@ -160,7 +160,7 @@ def runmodel(x_train: Tensor, y_train: Tensor,
         hyperparameter_optimizer = torch.optim.Adam([
             {'params': model.parameters()},
             {'params': likelihood.parameters()},
-        ], lr=0.01)
+        ], lr=initial_lr)
 
     scheduler_hypers = MultiStepLR(hyperparameter_optimizer,
                                    milestones=[int(0.5 * num_epochs), int(0.75 * num_epochs)],
@@ -238,27 +238,8 @@ def runmodel(x_train: Tensor, y_train: Tensor,
     torch.save(likelihood.state_dict(),"results/models/"+setting+"/likelihood"+fname)
 
     # Now return the prediction
-    return yhat_vector.clone().detach()
+    return yhat_vector.clone().detach(), model, likelihood
 
 
 
-def plot_loss(train_loss: List,filename: chr,setting: chr):
-    # Calculate a shift constant
-    min_loss = min(train_loss)
-    shift = abs(min_loss) + 1e-6  # Adding a small epsilon to avoid log(0)
 
-    # Shift the loss values to be positive
-    shifted_loss = [loss + shift for loss in train_loss]
-
-    # Plotting the training loss on a logarithmic scale
-    plt.plot(shifted_loss, "r-", label='Training Loss')  # 'r-' means red line
-    plt.yscale('log')  # Set the y-axis to log scale
-    plt.xlabel('Iterations')  # Label for the x-axis
-    plt.ylabel('Loss (Log Scale)')  # Label for the y-axis
-    plt.title('Training Loss over Iterations')  # Title of the plot
-    plt.legend()  # Show legend
-    plt.grid(True)  # Add grid for better readability
-    # plt.show()  # Display the plot
-    fname = "results/plots/" + setting + "/loss_" + filename + ".png"
-    plt.savefig(fname, format='png', dpi=300, bbox_inches='tight')
-    plt.close()
