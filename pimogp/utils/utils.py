@@ -138,7 +138,7 @@ def train_test_split_drugdata(input_type: Literal["raw","processed"], dataset: L
 
     # Processing the data
     X = drugs.iloc[:, 9:]
-    X = X.apply(zscore)
+    #X = X.apply(zscore)
     drugs = drugs.iloc[:, 0:1]
     XA = X.add_prefix("A")
     XB = X.add_prefix("B")
