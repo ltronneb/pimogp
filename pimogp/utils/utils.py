@@ -79,12 +79,12 @@ def plot_loss(train_loss: List,filename: chr,setting: chr):
     plt.savefig(fname, format='png', dpi=300, bbox_inches='tight')
     plt.close()
 
-def prepdata(dataset,targets,predtarget):
+def prepdata(dataset,targets,predtarget,num_latents):
     y = torch.tensor(dataset[targets].values).float()
     conc = dataset[['drugA_conc','drugB_conc']]
     task_indices = torch.tensor(dataset["task_index"].values).long()
     dataset = dataset.drop(columns=["task_index"])
-    drugcovars = dataset.iloc[:,-(50*2):]
+    drugcovars = dataset.iloc[:,-(num_latents*2):]
     X = torch.tensor(pd.concat([conc,drugcovars],axis=1).values).float()
     # Noise and weights
     if predtarget == "latent":
