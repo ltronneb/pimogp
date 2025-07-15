@@ -1,0 +1,50 @@
+
+data:
+  batch_size: 250
+  qm9_file: 'data/qm9.txt'
+  zinc_file: 'data/zinc_100k.txt'              ##'data/zinc_250k_substructure_chemistry.txt' ## zinc_250k.txt zinc_100k.txt
+  merged_drugs_file: 'data/merged_drugs.csv'
+  type_of_encoding: 1
+
+decoder:
+  latent_dimension: 50
+  gru_neurons_num: 100
+  gru_stack_size: 1
+
+encoder:
+  layer_1d: 100
+  layer_2d: 100
+  layer_3d: 100
+  latent_dimension: 50
+  
+gplvm:
+   latent_dim: 3
+   num_inducing: 350
+
+training:
+  KLD_alpha: 1.0e-04
+  lr_enc: 0.005
+  lr_dec: 0.005
+  num_epochs: 50
+  sample_num: 100
+  
+property_filter:
+    MW: True
+    LogS: False
+    LogD: False
+    LogP: False
+    nHA: True
+    nHD: True
+    TPSA: False
+    nRot: False
+    nRing: True
+    MaxRing: False
+    nHet: True
+    fChar: True
+    nRig: False
+    Flex: False
+    nStereo: True
+    QED: False
+    SAS: True
+    Fsp3: False
+    

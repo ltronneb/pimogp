@@ -31,7 +31,7 @@ class PermutationInvariantRBFKernel(Kernel):
 
         # Initialise the indexing for the permutation
         seen_pairs = set()
-        indices = torch.empty(permutation.shape[0]).long()
+        indices = torch.empty(permutation.shape[0]).long().to(device)
         idx = 0
         for i, j in enumerate(permutation):
             # Sort the pair so that (i, j) and (j, i) look the same in the set

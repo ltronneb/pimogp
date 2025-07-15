@@ -2,3 +2,7 @@
 /dist/
 /pimogp.egg-info/
 /venv/
+/pycache/
+*.pyc
+*/__pycache__/
+/pimogp/data/
