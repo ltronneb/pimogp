@@ -1,9 +1,9 @@
 
 data:
   batch_size: 250
-  qm9_file: 'data/qm9.txt'
-  zinc_file: 'data/zinc_100k.txt'              ##'data/zinc_250k_substructure_chemistry.txt' ## zinc_250k.txt zinc_100k.txt
-  merged_drugs_file: 'data/merged_drugs.csv'
+  qm9_file: 'pimogp/data/qm9.txt'
+  zinc_file: 'pimogp/data/zinc_100k.txt'              ##'data/zinc_250k_substructure_chemistry.txt' ## zinc_250k.txt zinc_100k.txt
+  merged_drugs_file: 'pimogp/data/merged_drugs.csv'
   type_of_encoding: 1
 
 decoder:
@@ -28,23 +28,4 @@ training:
   num_epochs: 50
   sample_num: 100
   
-property_filter:
-    MW: True
-    LogS: False
-    LogD: False
-    LogP: False
-    nHA: True
-    nHD: True
-    TPSA: False
-    nRot: False
-    nRing: True
-    MaxRing: False
-    nHet: True
-    fChar: True
-    nRig: False
-    Flex: False
-    nStereo: True
-    QED: False
-    SAS: True
-    Fsp3: False
     

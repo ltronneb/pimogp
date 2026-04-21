@@ -15,27 +15,27 @@ from torch import nn
 import torch.nn.functional as F
 from rdkit import Chem, DataStructs 
 from rdkit.Chem import Draw, AllChem
-from utils.one_hot_encoding import multiple_selfies_to_int, multiple_selfies_to_hot, multiple_smile_to_hot
-from utils.one_hot_encoding import get_selfie_and_smiles_encodings_for_dataset, multiple_selfies_to_int
+from pimogp.utils.one_hot_encoding import multiple_selfies_to_int, multiple_selfies_to_hot, multiple_smile_to_hot
+from pimogp.utils.one_hot_encoding import get_selfie_and_smiles_encodings_for_dataset, multiple_selfies_to_int
 
 # import the TransformerVAE class from your existing module
-from model.transformer_vae import TransformerVAE, kl_divergence, make_causal_mask
-from utils.transformer_vae_evals import compute_recon_quality, compute_mc_recon, compute_validation_recon
+from pimogp.models.transformer_vae import TransformerVAE, kl_divergence, make_causal_mask
+from pimogp.utils.transformer_vae_evals import compute_recon_quality, compute_mc_recon, compute_validation_recon
 
-import model.transformer_vae as tvae
+import pimogp.models.transformer_vae as tvae
 importlib.reload(tvae)
 
-# Load data
-def load_data(file_name_smiles):
+# Convert data to integer encoding
+def convert_data_to_int(merged_drugs_df):
     
     print('--> Acquiring data...')
     print('Representation: SELFIES')
-    encoding_list, encoding_alphabet, largest_molecule_len, smiles_list, smiles_alphabet, largest_smiles_len, properties = \
-        get_selfie_and_smiles_encodings_for_dataset(file_name_smiles)
+    encoding_list, encoding_alphabet, largest_molecule_len, smiles_list, smiles_alphabet, largest_smiles_len = \
+        get_selfie_and_smiles_encodings_for_dataset(merged_drugs_df)
     print('--> Creating integer encoding...')
     int_data = multiple_selfies_to_int(encoding_list, largest_molecule_len, encoding_alphabet)
     print('Finished creating integer encoding.')
-    return int_data, properties, encoding_alphabet
+    return int_data, encoding_alphabet
 
 # Generate unconditional samples
 def generate_unconditional(model, num_samples, max_seq_len, sos_idx, eos_idx, pad_idx, encoding_alphabet, sf):
@@ -113,15 +113,19 @@ def save_latents_to_disk(z_out, mu_out, logvar_out, save_dir="latents"):
 
 if __name__ == '__main__':
     
-    device = torch.device("cuda:4" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    if os.path.exists("utils/settings.yml"):
-            settings = yaml.safe_load(open("utils/settings.yml", "r"))
+    if os.path.exists("pimogp/utils/settings.yml"):
+            settings = yaml.safe_load(open("pimogp/utils/settings.yml", "r"))
     else:
         print("Expected a file settings.yml but didn't find it.")
         
-    file_name_smiles = settings['data']['merged_drugs_file']
-    int_data, properties, encoding_alphabet = load_data(file_name_smiles)
+    merged_drugs_df = pd.read_csv(settings['data']['merged_drugs_file'])
+    int_data, encoding_alphabet = convert_data_to_int(merged_drugs_df)
+
+    ## Extracting cancer drugs integer encoding
+    cancer_drugs_indices = merged_drugs_df.index[merged_drugs_df.tag == 'cancer'].tolist()
+    cancer_drugs_int_data = int_data[cancer_drugs_indices]
     
     ##### Extracting length of largest molecule
     
@@ -131,16 +135,21 @@ if __name__ == '__main__':
     #### Train, validation and test data 
        
     train_valid_test_size = [0.8, 0.1, 0.1]
+    
+    # Shuffle the data
+    shuffled_indices = torch.randperm(len(int_data))
+    int_data = int_data[shuffled_indices]
+    
     idx_train_val = int(len(int_data) * train_valid_test_size[0])
     idx_val_test = idx_train_val + int(len(int_data) * train_valid_test_size[1])
     
     data_train = int_data[0:idx_train_val]
-    #properties_train = properties[0:idx_train_val]
-    
-    data_valid = int_data[idx_train_val:idx_val_test]
-    #properties_valid = properties[idx_train_val:idx_val_test]
+    data_valid = int_data[idx_train_val:idx_val_test] 
     data_test = int_data[idx_val_test:]
-    #properties_test = properties[idx_val_test:]
+
+    data_train = data_train.to(device)
+    data_valid = data_valid.to(device)
+    data_test  = data_test.to(device)
 
     # Hyperparameters
     batch_size = 256
@@ -175,15 +184,14 @@ if __name__ == '__main__':
     z_dim=256,
     max_seq_len=len_max_molec
 ).to(device)
-    
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-5)
 
     # Learning rate scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
     
     # Training loop with causal and padding masks applied to decoder
-    for epoch in range(1, epochs + 1):
-    #for epoch in np.arange(97, 130):
+    #for epoch in range(40):
+    for epoch in range(29, 35):
         model.train()
         epoch_train_recons = []
         
@@ -238,43 +246,44 @@ if __name__ == '__main__':
             for i, (smiles, selfie) in enumerate(samples):
                 print(f"Sample {i+1}: {smiles}  <-- {selfie}")
                 
-            #mc_recon = compute_mc_recon(model, data_valid, n_enc=10, n_dec=10, pad_idx=pad_idx, batch_size=256)
-            #print(f"Monte Carlo molecule-level exact match: {mc_recon:.2f}%\n")
-
         scheduler.step(valid_rec)  # Adjust learning rate based on validation reconstruction accuracy
 
         current_lr = optimizer.param_groups[0]["lr"]
-        final_log = f"Epoch [{epoch}/{epochs}] | "
-        final_log += f"Avg Train Recon: {avg_train_rec:.4f}, "
-        final_log += f"Val Recon: {valid_rec:.4f}, "
-        final_log += f"LR: {current_lr:.2e}"
+        final_log = f"Epoch [{epoch}/{epochs}] | Avg Train Recon: {avg_train_rec:.4f} | Val Recon: {valid_rec:.4f} | LR: {current_lr:.2e}"
         print(final_log, flush=True)
         
         log_dir = f"logs/transformer_vae_cancer_merged_drugs_128_132_4_6_256_128_60_256_100"
         save_epoch_logs(log_dir, epoch, avg_train_rec, valid_rec, final_log, samples)
+
+        ## Saving the model
+        if settings['save_model']:
+            torch.save(model.state_dict(), f'pimogp/trained_transformers/transformer_vae_cancer_drugs_{epoch}.pt')
         
-        ##### Extract latent representations
-        
-        test_dataset = TensorDataset(data_test)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+        ##### Extract cancer drugs latent representations
+
+        cancer_drugs_dataset = TensorDataset(cancer_drugs_int_data)
+        cancer_drugs_dataloader = DataLoader(cancer_drugs_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
         
         latent_extractor = tvae.LatentExtractor(model)
-        z_all, mu_all, logvar_all = latent_extractor.extract_latents(test_dataloader)
+        z_all, mu_all, logvar_all = latent_extractor.extract_latents(cancer_drugs_dataloader)
         print(z_all.shape, mu_all.shape, logvar_all.shape)
         
         # Save latent representations to disk
-        save_latents_to_disk(z_all, mu_all, logvar_all)
+        save_latents_to_disk(z_all, mu_all, logvar_all, save_dir="pimogp/latents/transformer_vae_cancer_drugs")
+
+        # Load the latent representations
+        z_all = torch.load(f"pimogp/latents/transformer_vae_cancer_drugs/z_all.pt")
+        mu_all = torch.load(f"pimogp/latents/transformer_vae_cancer_drugs/mu_all.pt")
+        logvar_all = torch.load(f"pimogp/latents/transformer_vae_cancer_drugs/logvar_all.pt")
         
-        save_dir = "latents"
-        z_out = torch.load(f"{save_dir}/z_out.pt")
-        mu_out = torch.load(f"{save_dir}/mu_out.pt")
-        logvar_out = torch.load(f"{save_dir}/logvar_out.pt")
-
-
-    
-
-
-
-
-
-
+        # Plot the PCA of latent representations
+        from sklearn.decomposition import PCA
+        plt.figure(figsize=(10, 10))
+        pca = PCA(n_components=2)
+        z_pca = pca.fit_transform(z_all.cpu().detach().numpy())
+        plt.scatter(z_pca[:, 0], z_pca[:, 1], c=mu_all.cpu().detach().numpy()[:, 0], cmap='viridis')
+        plt.title('PCA of latent space - logP')
+        plt.xlabel('Component 1')
+        plt.ylabel('Component 2')
+        plt.colorbar()
+        plt.savefig(f"pimogp/cancer_drugs_pca_latent_representations.png")

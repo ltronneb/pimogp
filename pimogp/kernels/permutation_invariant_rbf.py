@@ -10,7 +10,6 @@ from gpytorch.priors import Prior
 from gpytorch.settings import trace_mode
 from torch import Tensor
 
-
 class PermutationInvariantRBFKernel(Kernel):
     has_lengthscale = True
 
@@ -25,9 +24,12 @@ class PermutationInvariantRBFKernel(Kernel):
         lengthscale_prior: Optional[Prior] = None,
         lengthscale_constraint: Optional[Interval] = None,
         eps: float = 1e-6,
+        device: torch.device = torch.device("cuda"),
         **kwargs,
-    ):
-        super(PermutationInvariantRBFKernel, self).__init__()
+    ):  
+        super().__init__()
+        print("Device: ", device)                   
+        # Store device for later use
 
         # Initialise the indexing for the permutation
         seen_pairs = set()
@@ -98,7 +100,7 @@ class PermutationInvariantRBFKernel(Kernel):
     def lengthscale(self, value: Tensor):
         if not torch.is_tensor(value):
             value = torch.as_tensor(value).to(self.raw_lengthscale)
-        reduced_inits = torch.empty(self.indices.max() + 1)
+        reduced_inits = torch.empty(self.indices.max() + 1).to(self.raw_lengthscale.device)
         for i in range(self.indices.max() + 1):
             mask = self.indices == i
             reduced_inits[i] = value[mask].mean()

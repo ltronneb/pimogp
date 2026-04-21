@@ -1,9 +1,9 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 import selfies as sf
-from model.transformer_vae import TransformerVAE, kl_divergence, make_causal_mask
+from pimogp.models.transformer_vae import TransformerVAE, kl_divergence, make_causal_mask
 
-device = torch.device("cuda:4" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Reconstruction quality ignoring pad tokens
 def compute_recon_quality(true_seq, pred_seq, pad_idx):

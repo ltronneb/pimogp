@@ -4,15 +4,15 @@ from copy import deepcopy
 import gc
 from importlib.resources import as_file, files
 from typing import List, Literal
-
 import numpy as np
 import pandas as pd
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood
 from gpytorch.mlls import VariationalELBO
 import torch
 from matplotlib import pyplot as plt
-from scipy.stats import zscore
 from sklearn.model_selection import GroupKFold, train_test_split
+
+
 
 
 def better_varelbo_init(x, y, noise, task_indices, model, likelihood, num_inits=100):

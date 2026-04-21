@@ -5,4 +5,13 @@
 /pycache/
 *.pyc
 */__pycache__/
-/pimogp/data/
+/pimogp/data/*
+!/pimogp/data/cancer_drugs_latents_pairs.csv
+!/pimogp/data/cancer_drugs_latents_pairs_surface_data.csv
+
+/pimogp/plots/
+/pimogp/surfaces/
+/pimogp/latents/
+/pimogp/trained_transformers/
+/plots/
+/results_plots/

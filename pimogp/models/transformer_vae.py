@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import re
 
-device = torch.device("cuda:4" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class TransformerEncoder(nn.Module):
     def __init__(self, vocab_size, embed_size, num_layers, num_heads, hidden_dim, max_seq_len, dropout=0.1):
