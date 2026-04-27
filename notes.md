@@ -83,6 +83,29 @@ The script is now a complete two-stage pipeline: SVD basis → MLP coefficient p
 | `pimogp/data/pca_components.npy` | PCA projection matrix (512, 32) |
 | `pimogp/data/mlp_predictor.pt` | Trained MLP state dict |
 
+## Collaborator notebook: notebooks/surface_explorer.ipynb
+
+Created `notebooks/surface_explorer.ipynb` — a self-contained notebook for collaborators to explore the two-stage pipeline interactively.
+
+### Structure (23 cells)
+
+1. **Load surfaces** — reads `cancer_drugs_latents_pairs_surface_data.csv` directly (parses stored array strings via `np.array([float(v) for v in x.strip('[]').split()])`), then merges latent columns from `cancer_drugs_latents_pairs.csv` on drugA/drugB. Stddev surfaces are loaded on-demand only for the 6 visualised pairs.
+2. **Functional PCA (SVD)** — train/test split (seed 42, same as script), SVD on train surfaces, singular value decay plot, basis function heatmaps, reconstruction scatter.
+3. **MLP training** — runs the full training loop in-notebook. Hyperparameters (`HIDDEN`, `DROPOUT`, `LR`, `WEIGHT_DECAY`, `EPOCHS`) exposed at the top of a cell. Saves model + PCA artifacts to `pimogp/data/`. Includes learning curve plot.
+4. **Evaluation** — true vs MLP-predicted scatter (train + test), side-by-side surface comparison for any held-out pair (change `pair_id`).
+5. **Interactive prediction** — `predict_pair(drugA, drugB)` function: if a GP surface exists, shows 3-panel true/predicted/residual; otherwise just plots the prediction.
+
+### Key design decision
+Notebook re-derives the SVD basis and PCA from scratch each run (using the same seed 42 split), so `svd_basis.pt` is not needed. Only the two tracked CSVs are required as inputs.
+
+## .gitignore fixes (2026-04-21)
+
+- **Critical**: changed `/pimogp/data/` → `/pimogp/data/*` — excluding a directory entirely prevents `!` negation rules inside it from working; excluding contents (`/*`) allows negation.
+- Fixed wrong paths `/pimogp/pimogp/plots/` and `/pimogp/pimogp/surfaces/` → `/pimogp/plots/` and `/pimogp/surfaces/`
+- Added `/pimogp/latents/` and `/pimogp/trained_transformers/` (were untracked but unexcluded)
+- Moved `/pimogp/plots/` and `/pimogp/results_plots/` to `/plots/` and `/results_plots/` (correct repo-root-relative paths)
+- Only two data files are tracked: `cancer_drugs_latents_pairs.csv` and `cancer_drugs_latents_pairs_surface_data.csv`
+
 ## Bug fixes made
 
 - `surface_embedding_and_prediction.py` line 11: changed `import matplotlib.pylab as plt` → `import matplotlib.pyplot as plt` (pylab deprecated in matplotlib 3.9+, caused AttributeError on rcParams)
