@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
         # Tag them with the drug names
         cancer_drugs_df = pd.read_csv("pimogp/data/final_drugs.csv")
-        names = cancer_drugs_df.iloc[cancer_drugs_smiles.index]['Name']
+        names = cancer_drugs_df.iloc[cancer_drugs_smiles['index']]['Name']
 
         # Tag them with the latent representations
         drug_latents = pd.DataFrame(z_all, index=names)

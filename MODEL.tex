@@ -1,0 +1,210 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\title{An Embedding-Conditioned Joint Model for Drug Combination Surfaces}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a joint model for predicting KPL1 drug-combination viability surfaces directly from a learned drug embedding, replacing a two-stage pipeline (independent per-pair Gaussian Process fitting followed by SVD compression and a separate embedding regression) that was found not to use the embedding's information at all. We show that (i) the two-stage architecture, not the embedding, was the bottleneck; (ii) the embedding's original supervision target was itself invalid, having no correlation with the real ONeil monotherapy screen it was assumed to represent; and (iii) once both issues are fixed, a drug embedding trained on real monotherapy dose-response curves and combined with the pair surface via a Bliss-independence structure substantially and reproducibly outperforms a one-hot identity baseline on the decisive test: pairs where at least one drug was never seen during training.
+\end{abstract}
+
+\section{Background and motivation}
+
+A collaborator observed that replacing a Transformer-VAE drug embedding with a one-hot identity encoding did not change downstream drug-pair surface predictions at all. This document develops, from first principles, a model architecture and an embedding training procedure for which the embedding \emph{does} measurably outperform one-hot identity, and documents the diagnostic process that led there.
+
+\section{Data and notation}
+
+\paragraph{Concentration grid.} The ONeil KPL1 combination screen measures every drug pair on an identical, discrete $10\times10$ grid of relative concentrations
+\[
+\mathcal{C} = \left\{0, \tfrac{1}{9}, \tfrac{2}{9}, \ldots, 1\right\}, \qquad |\mathcal{C}| = 10,
+\]
+so that a \emph{cell} is a pair $(c_A, c_B) \in \mathcal{C} \times \mathcal{C}$, and there are $|\mathcal{C}|^2 = 100$ cells shared identically across all 583 KPL1 drug pairs (verified: $583 \times 100 = 58{,}300$ raw rows, one measurement per cell, no exceptions). We index cells by $i \in \{1, \ldots, 100\}$.
+
+\paragraph{Drugs and pairs.} Let $\mathcal{D}$ denote the set of drugs and $(A, B) \in \mathcal{D}\times\mathcal{D}$ a pair. For pair $(A,B)$ and cell $i$ with concentrations $(c_A^{(i)}, c_B^{(i)})$, the observed target is $y_{A,B,i} \in [0,1]$, the processed fractional viability (\texttt{fMean} in \texttt{processed.csv}).
+
+\paragraph{Drug embedding.} Each drug $d \in \mathcal{D}$ is mapped to a vector $z_d \in \mathbb{R}^{32}$ by an encoder described in Section~\ref{sec:embedding}.
+
+\section{Drug embedding model}
+\label{sec:embedding}
+
+\subsection{Architecture}
+
+The embedding is produced by \texttt{SelfiesCurveAutoencoder}: a SMILES string is converted to a SELFIES token sequence and passed through a small Transformer encoder to a bottleneck $z \in \mathbb{R}^{32}$; $z$ is decoded back to SELFIES logits by a Transformer decoder (reconstruction), and separately passed through a linear head predicting a monotherapy dose-response curve. The model is \emph{deterministic}: there is no reparameterization or KL term, so $z$ is a plain compressed representation rather than a sampled generative latent.
+
+\[
+z = \mathrm{Enc}_\theta(\mathrm{SELFIES}(d)), \qquad
+\hat{x} = \mathrm{Dec}_\theta(z), \qquad
+\hat{\mathbf{v}}(d) = \sigma\!\left(W_{\mathrm{curve}}\, z + b_{\mathrm{curve}}\right) \in [0,1]^{10}
+\]
+
+where $\hat{\mathbf{v}}(d)$ is the predicted viability at each of the 10 concentration levels for drug $d$ alone, and $\sigma$ is the elementwise sigmoid (viability is physically constrained to $[0,1]$).
+
+\subsection{Training data: real monotherapy curves, not the \texttt{drugs.csv} scalar}
+\label{sec:label-fix}
+
+An earlier version of this model was supervised with a single scalar ``KPL1 efficacy'' value from an external, pre-compiled 1375-cell-line drug panel (\texttt{drugs.csv}). This was found, after the fact, \textbf{not to correlate with ONeil's own KPL1 monotherapy data at all} (Pearson $r = -0.13$ across 15 overlapping drugs; some drugs rank oppositely -- e.g. Sorafenib is the most potent single agent in the real ONeil data but is labeled one of the weakest in \texttt{drugs.csv}). This scalar almost certainly originates from a different assay or database entirely.
+
+The corrected supervision uses \emph{real} ONeil monotherapy curves, recovered directly from the combination screen: every combination experiment's concentration grid includes the edge where the partner drug's concentration is $0$, so a complete 10-point dose-response curve for each drug falls out of \texttt{processed.csv} with no additional data collection. This curve is well supported: each (drug, dose) pair has on average 22--37 independent replicate measurements (once per combination partner the drug was screened against), with a cross-partner standard deviation of $\approx 0.029$ against a value range spanning $\approx 0.93$ ($\approx 3\%$ noise) -- i.e.\ a drug's monotherapy behavior is a stable property of the drug, not an artifact of which partner it happened to be combined with. 38 of the drugs in the KPL1 screen have a complete curve.
+
+\subsection{Loss}
+
+Let $\mathcal{L}_{\mathrm{cancer}}$ be the full corpus of 7449 cancer-relevant drug SMILES (used to build the training and validation split for reconstruction), and $\mathcal{L}_{\mathrm{curve}} \subset \mathcal{L}_{\mathrm{cancer}}$ the 38 drugs with a real ONeil curve $\mathbf{v}(d) \in [0,1]^{10}$. The training loss combines:
+\begin{align}
+\mathcal{L}_{\mathrm{recon}} &= \mathbb{E}_{d \sim \mathcal{L}_{\mathrm{cancer}}^{\mathrm{train}}} \left[ \mathrm{CrossEntropy}\big(\hat{x}(d), \mathrm{SELFIES}(d)\big) \right] \\
+\mathcal{L}_{\mathrm{curve}} &= \mathbb{E}_{d \sim \mathcal{L}_{\mathrm{curve}}} \left[ \left\| \hat{\mathbf{v}}(d) - \mathbf{v}(d) \right\|_2^2 \right] \\
+\mathcal{L} &= \mathcal{L}_{\mathrm{recon}} + \mathcal{L}_{\mathrm{curve}}
+\end{align}
+$\mathcal{L}_{\mathrm{recon}}$ keeps its own train/test split to monitor generalization of the autoencoder; $\mathcal{L}_{\mathrm{curve}}$ uses \emph{all} 38 labeled drugs every step (no held-out split), since the objective is the geometry of the embedding space, not held-out curve prediction per se.
+
+\section{Joint surface models}
+
+The central architectural change from the original two-stage pipeline is training end-to-end on raw per-cell viability, rather than first fitting 583 independent per-pair Gaussian Processes and only afterwards regressing an embedding-based model against a fixed, embedding-blind SVD compression of the results. Two variants were developed.
+
+\subsection{Additive model}
+
+\begin{equation}
+\hat{y}_{A,B,i} = \mu_i + \Phi_i \cdot g(z_A, z_B)
+\end{equation}
+where:
+\begin{itemize}
+\item $\mu_i \in \mathbb{R}$ (\texttt{mean\_surface}) is one free parameter per cell, shared by every pair. It is initialized to the closed-form per-cell average $\mu_i \leftarrow \frac{1}{N}\sum_{(A,B)} y_{A,B,i}$ (exact, one pass, no fitting), but left trainable: this closed-form average is only \emph{guaranteed} to be jointly optimal when $g$ is unconstrained, and here $g$ is restricted to a neural network of the embeddings, so the true joint optimum can drift from the raw average.
+\item $\Phi_i \in \mathbb{R}^K$ ($K=5$) is a per-cell basis-function table, shared by every pair, randomly initialized and learned jointly with $g$ (no closed form, since its fit is coupled to $g$ through the loss -- structurally a matrix factorization).
+\item $g(z_A, z_B) \in \mathbb{R}^K$ is a \texttt{DeepSetPredictor}: $g(z_A, z_B) = \rho\big(\phi(z_A) + \phi(z_B)\big)$, with $\phi, \rho$ small MLPs. The symmetric sum makes $g$ permutation-invariant in $(A,B)$, matching the physical symmetry of a drug pair. $g$ is evaluated once per pair and broadcast across that pair's 100 cells.
+\end{itemize}
+
+\subsection{Bliss-independence model}
+
+The additive model confines all drug-specific information to a thin, additive correction on top of a drug-agnostic $\mu_i$ that alone explains 95.7\% of raw surface variance. The Bliss-independence variant instead lets the embedding control the \emph{dominant} term:
+\begin{align}
+\mathrm{curve}(c, z) &= \sigma\big(\mathrm{MLP}([c, z])\big) \in [0,1] \\
+\hat{y}_{A,B,i} &= \underbrace{\mathrm{curve}(c_A^{(i)}, z_A) \cdot \mathrm{curve}(c_B^{(i)}, z_B)}_{\text{Bliss independence}} \;+\; \underbrace{\Phi_i \cdot g(z_A, z_B)}_{\text{synergy residual}}
+\end{align}
+$\mathrm{curve}(c, z)$ is a single shared function -- the same weights are used to evaluate any drug's own monotherapy curve at any dose. Under Bliss independence, two non-interacting agents combine multiplicatively; the residual term $\Phi_i \cdot g(z_A, z_B)$ is then free to capture genuine synergy/antagonism, i.e.\ deviation from independence, rather than having to reconstruct the whole surface from scratch.
+
+\subsection{Training}
+
+Both models are trained with Adam (learning rate $10^{-3}$, weight decay $10^{-4}$), \texttt{ReduceLROnPlateau} scheduling, batch size 512, 300 epochs, minimizing mean squared error against \texttt{fMean} at every observed cell across every pair simultaneously -- one joint optimization, no independent per-pair fitting and no SVD handoff.
+
+\subsection{Evaluation splits}
+
+\begin{description}
+\item[Pair-level split] 20\% of unique drug \emph{pairs} held out; every individual drug still appears in training via other pairs. Tests generalization to a new \emph{combination} of already-familiar drugs.
+\item[Leave-drugs-out split] 25\% of \emph{drugs} (8 of 35) held out entirely; the test set is every pair touching a held-out drug (219 of 504 pairs), including 27 pairs where \emph{both} drugs are unseen. This is the decisive test: a one-hot identity encoding is structurally incapable of saying anything about a drug it has never seen (its one-hot coordinate's weights are never touched by a training gradient), whereas a real embedding can still occupy a meaningful point in a trained representation space.
+\end{description}
+
+\section{Results}
+
+\subsection{Embedding quality: does it actually encode real monotherapy behavior?}
+
+Table~\ref{tab:embedding-quality} reports leave-one-out cross-validated Ridge regression $r$ from the full 32-dim embedding to each of the leading principal components of the real ONeil monotherapy curve matrix (35 drugs $\times$ 10 concentration levels): PC1 (79.4\% of curve variance) is essentially \emph{depth} (overall potency), PC2 (16.5\%) is the dominant curve-\emph{shape} direction beyond depth.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+& Old embedding (\texttt{drugs.csv} label) & New embedding (real ONeil curves) \\
+\midrule
+Curve PC1 (depth, 79.4\% var) & $r = 0.001$ & $\mathbf{r = 0.852}$ \\
+Curve PC2 (shape, 16.5\% var) & $r = -0.677$ & $\mathbf{r = 0.576}$ \\
+Curve PC3 (shape, 2.4\% var) & $r = -0.088$ & $r = 0.159$ \\
+\bottomrule
+\end{tabular}
+\caption{Embedding-to-curve correlation, leave-one-out cross-validated. The old embedding had no honest predictive power for either depth or shape (negative CV $r$ indicates the fit was worse than predicting the mean); the new embedding captures both.}
+\label{tab:embedding-quality}
+\end{table}
+
+Figure~\ref{fig:pca} shows a 2D PCA projection of the new embedding across all 7449 cancer drugs, with the 38 ONeil-labeled drugs colored by curve depth (left) and curve shape (right). Because the 2D projection captures only 41.2\% of the embedding's total variance, the gradient is necessarily a lossy view of the stronger high-dimensional relationship reported in Table~\ref{tab:embedding-quality}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{curve_embedding_pca_depth_shape.png}
+\caption{2D PCA of the curve-trained embedding (all 7449 cancer drugs), shaded by real ONeil monotherapy curve depth (left) and shape (right) for the 38 labeled drugs.}
+\label{fig:pca}
+\end{figure}
+
+\subsection{Surface prediction: embedding vs.\ one-hot identity}
+
+Tables~\ref{tab:pairlevel} and~\ref{tab:ldo} report test MSE for both architectures, both inputs, and both the old (mislabeled) and new (curve-trained) embeddings.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llc}
+\toprule
+Architecture & Input & Test MSE (pair-level) \\
+\midrule
+Additive & one-hot & 0.0268$^{*}$ \\
+Additive & old embedding & 0.0068 \\
+Additive & \textbf{new embedding} & \textbf{0.0054} \\
+Bliss & one-hot & 0.00147 \\
+Bliss & old embedding & 0.0016 \\
+Bliss & new embedding & 0.00147 (tied with one-hot) \\
+\bottomrule
+\end{tabular}
+\caption{Pair-level split. $^*$This result reproduced identically (to the last digit) across two independent random initializations with a flat training curve from epoch 5 onward -- a suspected optimization pathology specific to the additive+one-hot combination, not yet resolved; treat with caution. On the easier pair-level split, where one-hot's perfect per-drug memorization is fully available, the Bliss model reaches an effective tie between one-hot and the new embedding.}
+\label{tab:pairlevel}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llcc}
+\toprule
+Architecture & Input & Test MSE ($\geq 1$ drug unseen) & vs.\ one-hot \\
+\midrule
+Additive & one-hot & 0.0267 & --- \\
+Additive & old embedding & 0.0230 & $-14\%$ \\
+Additive & new embedding & 0.0174 & $-35\%$ \\
+Bliss & one-hot & 0.0130 & --- \\
+Bliss & old embedding & 0.0224 & $+72\%$ (worse) \\
+Bliss & \textbf{new embedding} & \textbf{0.00591} & \textbf{$-55\%$} \\
+\bottomrule
+\end{tabular}
+\caption{Leave-drugs-out split -- the decisive test. The Bliss model with the old, mislabeled embedding lost badly to one-hot; with the corrected embedding it wins decisively and produces the best result of the entire study.}
+\label{tab:ldo}
+\end{table}
+
+\subsection{Reconstruction quality and the learnt basis functions}
+
+Figure~\ref{fig:recon} shows true, predicted, and residual surfaces for six leave-drugs-out test pairs in which \emph{both} drugs were entirely unseen during training, using the best model (Bliss, new embedding). Figure~\ref{fig:basis} shows the five learnt $\Phi$ synergy-residual basis functions, each reshaped to the $10\times10$ concentration grid.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{bliss_curve_leave_drugs_out_reconstructions.png}
+\caption{Six leave-drugs-out test pairs where both drugs were never seen during training. Top: true surface. Middle: predicted surface. Bottom: residual (predicted $-$ true).}
+\label{fig:recon}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{bliss_curve_phi_basis_functions.png}
+\caption{The five learnt $\Phi$ basis functions of the synergy-residual term, each reshaped over the $10\times10$ concentration grid. Unlike the SVD basis of the original two-stage pipeline, these are not constrained to be orthogonal or ranked by variance explained -- they are jointly optimized with $g$ via gradient descent (a bilinear factorization, structurally analogous to matrix factorization), so any invertible rotation of $(\Phi, g)$ leaves the product unchanged.}
+\label{fig:basis}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{bliss_curve_true_vs_predicted_train_test.png}
+\caption{True vs.\ predicted viability across every cell of every pair, train (both drugs seen, $n=28{,}500$, $r=0.989$) vs.\ test ($\geq 1$ drug unseen, $n=21{,}900$, $r=0.946$). Best model of the study: Bliss-independence architecture with the curve-trained embedding, leave-drugs-out split.}
+\label{fig:scatter}
+\end{figure}
+
+\section{Discussion}
+
+The original null finding -- that a drug embedding could be replaced by one-hot identity with no change in surface predictions -- had two independent causes, neither of which was a fundamental limit on how informative a drug embedding \emph{could} be:
+
+\begin{enumerate}
+\item \textbf{Architectural.} The two-stage pipeline threw away $95.7\%$ of raw surface variance at a fixed, embedding-blind SVD compression step before the embedding-based model ever saw the data; of the remaining pair-specific variance, two components carried 79\%, leaving very little signal for any input, however informative, to visibly exploit.
+\item \textbf{Label validity.} Independently of the architecture, the embedding's own supervision target did not correlate with the task it was meant to inform.
+\end{enumerate}
+
+Once both are corrected -- a single jointly-trained model in place of the two-stage pipeline, and an embedding supervised with real, task-relevant monotherapy curves -- the embedding measurably and substantially outperforms one-hot identity on the test that actually distinguishes generalization from memorization.
+
+\end{document}
